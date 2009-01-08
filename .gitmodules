@@ -1,0 +1,3 @@
+[submodule "lib/clojure/specjure"]
+	path = lib/clojure/specjure
+	url = git://github.com/larrytheliquid/specjure.git
