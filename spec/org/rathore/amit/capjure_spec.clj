@@ -1,29 +1,15 @@
 (ns capjure-spec)
 
 (use 'clojure.contrib.test-is)
+(require '(org.danlarkin [json :as json]))
 (use 'org.rathore.amit.capjure)
 
-(def hash_object 
-     {
-      "inserts": [{
-		   "cinch_unit_price": 33.26, 
-		   "html_id": "cinch_id_1231449290449", 
-		   "active_campaigns": [3, 4, 7, 10, 11, 13], 
-		   "merchant_unit_price": 36.95, 
-		   "campaign_id": 13, 
-		   "insert_type": "display_type"}], 
-      "session": {
-		  "merchant_session_id": "cc0bd4007dd531c031b22a4c18224e85", 
-		  "cinch_session_id": "b2392df2aa5765a332208f5cbf49c13d", 
-		  "uber_session_id": "e5ac21a0-8eea-e6f6-3434-369cd7909355"
-		  }, 
-      "api": "0.0.1.0", 
-      "consumer": {
-		   "email_address": "8fe6865c-6450-5a3b-2497-7e3a2734b7f4@visitor.cinchcorp.com", 
-		   "kind": "visitor", 
-		   "id": 30137
-		   }
-      })
+(def message-string "{\"consumer\": {\"kind\": \"visitor\", \"id\": 114, \"email_address\": \"2d2bbc2b-5719-eb56-1cef-b0c275315198@visitor.cinchcorp.com\"}, \"session\": {\"uber_session_id\": \"4531fe59-3aff-e570-0233-24f6d2bb3ca0\", \"merchant_session_id\": \"03e65d5456e26669f2e9ae7d13cf9a57\", \"cinch_session_id\": \"7e39738f50dfefd8a00ffcd38f7d557a\"}, \"api\": \"0.0.1.0\", \"inserts\": [{\"cinch_unit_price\": 36.95, \"active_campaigns\": [3, 4, 7], \"campaign_id\": -1, \"html_id\": \"cinch_id_1231474450408\", \"merchant_unit_price\": 36.95, \"insert_type\": null}]}")
 
-(deftest test-trial
-  (is (= 1 1)))
+(def hash-object 
+     (json/decode-from-str message-string))
+
+(deftest test-prepend-to-keys
+  (let [to-prepend (hash-object :consumer)
+	prepended (prepend-to-keys "con" to-prepend)]
+    (is (= (keys prepended) (list "con:kind" "con:id" "con:email_address")))))
