@@ -12,27 +12,30 @@
    (keyword? prefix) (name prefix)
    (string? prefix) prefix))
 
-(defn postfixed-key [key separator postfix]
-  (str (symbol-name key) separator (symbol-name postfix)))
+;(defn postfixed-key [key separator postfix]
+;  (str (symbol-name key) separator (symbol-name postfix)))
 
-(defn prefixed-key [key separator prefix]
-  (str (symbol-name prefix) separator (symbol-name key)))
+;(defn prefixed-key [key separator prefix]
+;  (str (symbol-name prefix) separator (symbol-name key)))
+
+(defn new-key [part1 separator part2]
+  (str (symbol-name part1) separator (symbol-name part2)))
 
 (defn prepend-to-keys [prefix separator hash-map]
   (let [all-keys (to-array (keys hash-map))]
     (areduce all-keys idx ret {} 
 	     (assoc ret 
-	       (prefixed-key (aget all-keys idx) separator prefix)
+	       (new-key prefix separator (aget all-keys idx))
 	       (hash-map (aget all-keys idx))))))
 
 (defn postpend-to-keys [postfix separator hash-map]
   (let [all-keys (to-array (keys hash-map))]
     (areduce all-keys idx ret {} 
 	     (assoc ret 
-	       (postfixed-key (aget all-keys idx) separator postfix)
+	       (new-key (aget all-keys idx) separator postfix)
 	       (hash-map (aget all-keys idx))))))
 
-(declare process-multiple process-maps process-strings)
+(declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
   (cond
    (not (vector? value)) (prepend-to-keys key ":" value)
@@ -46,13 +49,17 @@
 
 (defn process-maps [key maps]
   (let [qualifier (*qualifier-config* key)]
-    (println "qualifier is " qualifier)
     (apply merge (map 
 		  (fn [single-map]
-		    (let [prefix (prefixed-key key "_" (single-map qualifier))]
-		      (println "prefix is " prefix)
-		      (prepend-to-keys prefix "" (dissoc single-map qualifier))))
+		    (process-map (symbol-name key) (single-map qualifier) (dissoc single-map qualifier)))
 		  maps))))
+
+(defn process-map [initial-prefix final-prefix single-map]
+  (let [all-keys (to-array (keys single-map))]
+    (areduce all-keys idx ret {}
+	     (assoc ret
+		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) ":" final-prefix)
+		   (single-map (aget all-keys idx))))))
 
 (defn process-strings [key strings] ())
 

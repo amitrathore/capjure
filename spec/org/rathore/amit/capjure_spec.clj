@@ -46,9 +46,12 @@
     (is (= (flattened "two:d") 4))))
 
 (deftest test-flatten-value-configured
-  (println "running test")
   (let [to-process {:inserts [{:merchant_product_id "kel-10-ab" :merchant_price "11.00" :cinch_price "9.95"}
 			      {:merchant_product_id "sut-91-xy" :merchant_price "8.00" :cinch_price "6.55"}]}
 	processed (flatten to-process)]
     (is (= (count (keys processed)) 4))
-    (is-same-sequence (keys processed) '("inserts_merchant_price:kel-10-ab" "inserts_cinch_price:kel-10-ab" "inserts_merchant_price:sut-91-xy" "inserts_cinch_price:sut-91-xy"))))
+    (is-same-sequence (keys processed) '("inserts_merchant_price:kel-10-ab" "inserts_cinch_price:kel-10-ab" "inserts_merchant_price:sut-91-xy" "inserts_cinch_price:sut-91-xy"))
+    (is (= (processed "inserts_merchant_price:kel-10-ab") "11.00"))
+    (is (= (processed "inserts_merchant_price:sut-91-xy") "8.00"))
+    (is (= (processed "inserts_cinch_price:kel-10-ab") "9.95"))
+    (is (= (processed "inserts_cinch_price:sut-91-xy") "6.55"))))
