@@ -28,7 +28,7 @@ fi
 
 CAPJURE_HOME="."
 capjure_jars="${CAPJURE_HOME}/lib/java/"
-capjure_clj="${CAPJURE_HOME}/lib/clojure/specjure/src/:${CAPJURE_HOME}/lib/clojure/conjure/src/"
+capjure_clj="${CAPJURE_HOME}/spec/"
 capjure_src="${CAPJURE_HOME}/src/"
 
 clj_cp="."
