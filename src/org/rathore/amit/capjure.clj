@@ -10,13 +10,7 @@
 (defn symbol-name [prefix]
   (cond
    (keyword? prefix) (name prefix)
-   (string? prefix) prefix))
-
-;(defn postfixed-key [key separator postfix]
-;  (str (symbol-name key) separator (symbol-name postfix)))
-
-;(defn prefixed-key [key separator prefix]
-;  (str (symbol-name prefix) separator (symbol-name key)))
+   :else (str prefix)))
 
 (defn new-key [part1 separator part2]
   (str (symbol-name part1) separator (symbol-name part2)))
@@ -38,14 +32,15 @@
 (declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
   (cond
-   (not (vector? value)) (prepend-to-keys key ":" value)
-   :else (process-multiple key value)))
+   (map? value) (prepend-to-keys key ":" value)
+   (vector? value) (process-multiple key value)
+   :else {key value}))
 
 (defn process-multiple [key values]
   (let [all (seq values)]
     (cond
      (map? (first all)) (process-maps key all)
-     :else (process-strings key all))))
+     :else (process-strings key (to-array all)))))
 
 (defn process-maps [key maps]
   (let [qualifier (*qualifier-config* key)]
@@ -61,7 +56,9 @@
 		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) ":" final-prefix)
 		   (single-map (aget all-keys idx))))))
 
-(defn process-strings [key strings] ())
+(defn process-strings [key strings] 
+  (areduce strings idx ret {}
+	   (assoc ret (new-key key ":" (aget strings idx)) (aget strings idx))))
 
 (defn flatten [bloated_object]
   (apply merge (map 

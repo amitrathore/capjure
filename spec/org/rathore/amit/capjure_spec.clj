@@ -55,3 +55,20 @@
     (is (= (processed "inserts_merchant_price:sut-91-xy") "8.00"))
     (is (= (processed "inserts_cinch_price:kel-10-ab") "9.95"))
     (is (= (processed "inserts_cinch_price:sut-91-xy") "6.55"))))
+
+(deftest test-flatten-array-of-strings
+  (let [to-flatten {:active_campaigns [3 4 7 10 11 13]}
+	flattened (flatten to-flatten)]
+    (is (= (count (keys flattened)) 6))
+    (is (= (flattened "active_campaigns:3") 3))
+    (is (= (flattened "active_campaigns:4") 4))
+    (is (= (flattened "active_campaigns:7") 7))
+    (is (= (flattened "active_campaigns:10") 10))
+    (is (= (flattened "active_campaigns:11") 11))
+    (is (= (flattened "active_campaigns:13") 13))))
+
+(deftest test-flatten-large-object
+  (let [flattened (flatten hash-object)
+	all-keys (keys flattened)]
+    (is (= (count all-keys) 18))))
+    
