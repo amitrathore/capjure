@@ -9,18 +9,28 @@
 (def *hbase-master* "localhost:60000")
 (def *qualifier-config* {:inserts :merchant_product_id})
 
-(declare flatten add-to-insert-batch)
+(defn test-save [data-string]
+  (let [table (HTable. (HBaseConfiguration.) "amit_development_consumer_events")
+       batch-update (BatchUpdate. "myRow")]
+    (.put batch-update "api:", (.getBytes data-string))
+    (.commit table batch-update)))
+
+(declare flatten add-to-insert-batch capjure-insert)
+(defn try-to-insert [object hbase-table]
+  (try
+   (capjure-insert object hbase-table)
+   (catch Exception _ (println "exception!!"))))
+
 (defn capjure-insert [object-to-save hbase-table-name]
   (let [flattened (flatten object-to-save)
-	hbase-config (HBaseConfiguration.)]
-    (.set hbase-config "hbase.master" *hbase-master*)
-    (let [table (HTable. hbase-config hbase-table-name)
-	  batch-update (BatchUpdate. (str (System/currentTimeMillis)))]
-      (map add-to-insert-batch (seq flattened))
-      (.commit table batch-update))))
+	table (HTable. (HBaseConfiguration.) "amit_development_consumer_events")
+	batch-update (BatchUpdate. (str (System/currentTimeMillis)))]
+    (dorun (add-to-insert-batch batch-update flattened))
+    (.commit table batch-update)))
 
-(defn add-to-insert-batch [batch-update column value]
-  (.put batch-update column (.getBytes value)))
+(defn add-to-insert-batch [batch-update flattened]
+;  (loop [column (first
+    (.put batch-update column (.getBytes (str value)))))
 
 (defn symbol-name [prefix]
   (cond
@@ -49,7 +59,7 @@
   (cond
    (map? value) (prepend-to-keys key ":" value)
    (vector? value) (process-multiple key value)
-   :else {(symbol-name key) value}))
+   :else {(new-key key ":" "") value}))
 
 (defn process-multiple [key values]
   (let [all (seq values)]

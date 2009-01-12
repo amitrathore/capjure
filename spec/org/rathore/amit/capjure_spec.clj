@@ -71,5 +71,6 @@
 (deftest test-flatten-large-object
   (let [flattened (flatten hash-object)
 	all-keys (keys flattened)]
-    (is (= (count all-keys) 18))))
+    (is (= (count all-keys) 18))
+    (is (= (flattened "api") "0.0.1.0"))))
     
