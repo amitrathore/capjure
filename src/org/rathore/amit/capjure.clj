@@ -9,16 +9,16 @@
 (def *hbase-master* "tank.cinchcorp.com:60000")
 (def *primary-keys-config* {:inserts :merchant_product_id})
 
+
 (declare flatten add-to-insert-batch capjure-insert)
 (defn capjure-insert [object-to-save hbase-table-name]
   (let [h-config (HBaseConfiguration.) 	
 	ignore-this (.set h-config "hbase.master", *hbase-master*)
-	table (HTable. (HBaseConfiguration.) hbase-table-name)
+	table (HTable. h-config hbase-table-name)
 	batch-update (BatchUpdate. (str (System/currentTimeMillis)))
 	flattened (flatten object-to-save)]
     (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)
-    (println "******* FBASE updated! *******")))
+    (.commit table batch-update)))
 
 (defn add-to-insert-batch [batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
