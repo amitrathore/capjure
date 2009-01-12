@@ -12,7 +12,9 @@
 (defn test-save [data-string]
   (let [table (HTable. (HBaseConfiguration.) "amit_development_consumer_events")
        batch-update (BatchUpdate. "myRow")]
-    (.put batch-update "api:", (.getBytes data-string))
+    (.put batch-update "consumer:a", (.getBytes (str data-string "00")))
+    (.put batch-update "consumer:b", (.getBytes (str data-string "01")))
+    (.put batch-update "consumer:c", (.getBytes (str data-string "02")))
     (.commit table batch-update)))
 
 (declare flatten add-to-insert-batch capjure-insert)
@@ -25,12 +27,19 @@
   (let [flattened (flatten object-to-save)
 	table (HTable. (HBaseConfiguration.) "amit_development_consumer_events")
 	batch-update (BatchUpdate. (str (System/currentTimeMillis)))]
-    (dorun (add-to-insert-batch batch-update flattened))
+    (println (add-to-insert-batch batch-update flattened))
     (.commit table batch-update)))
 
-(defn add-to-insert-batch [batch-update flattened]
-;  (loop [column (first
-    (.put batch-update column (.getBytes (str value)))))
+(defn add-to-insert-batch [batch-update flattened-list]
+  (loop [flattened-pairs flattened-list]
+    (if (empty? flattened-pairs)
+      :done
+      (let [first-pair (first flattened-pairs)
+	    column (first first-pair)
+	    value (last first-pair)]
+	(println "adding to batch: " column)
+	(.put batch-update column (.getBytes (str value)))
+	(recur (rest flattened-pairs))))))
 
 (defn symbol-name [prefix]
   (cond
