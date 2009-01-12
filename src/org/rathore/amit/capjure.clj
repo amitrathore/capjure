@@ -15,7 +15,7 @@
 	hbase-config (HBaseConfiguration.)]
     (.set hbase-config "hbase.master" *hbase-master*)
     (let [table (HTable. hbase-config hbase-table-name)
-	  batch-update (BatchUpdate. (System/currentTimeMillis))]
+	  batch-update (BatchUpdate. (str (System/currentTimeMillis)))]
       (map add-to-insert-batch (seq flattened))
       (.commit table batch-update))))
 
