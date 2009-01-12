@@ -17,7 +17,8 @@
 	batch-update (BatchUpdate. (str (System/currentTimeMillis)))
 	flattened (flatten object-to-save)]
     (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)))
+    (.commit table batch-update)
+    (println "******* FBASE updated! *******")))
 
 (defn add-to-insert-batch [batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
