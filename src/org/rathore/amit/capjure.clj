@@ -1,11 +1,26 @@
 (ns org.rathore.amit.capjure)
 
+(import '(org.apache.hadoop.hbase HBaseConfiguration)
+	'(org.apache.hadoop.hbase.client HTable Scanner)
+	'(org.apache.hadoop.hbase.io BatchUpdate Cell))
+
+
 (def *mock-mode* false)
-(def *hbase-master* "tank.cinchcorp.com")
+(def *hbase-master* "localhost:60000")
 (def *qualifier-config* {:inserts :merchant_product_id})
 
-(defn save [object_to_save]
-  ())
+(declare flatten add-to-insert-batch)
+(defn capjure-insert [object-to-save hbase-table-name]
+  (let [flattened (flatten object-to-save)
+	hbase-config (HBaseConfiguration.)]
+    (.set hbase-config "hbase.master" *hbase-master*)
+    (let [table (HTable. hbase-config hbase-table-name)
+	  batch-update (BatchUpdate. (System/currentTimeMillis))]
+      (map add-to-insert-batch (seq flattened))
+      (.commit table batch-update))))
+
+(defn add-to-insert-batch [batch-update column value]
+  (.put batch-update column (.getBytes value)))
 
 (defn symbol-name [prefix]
   (cond
