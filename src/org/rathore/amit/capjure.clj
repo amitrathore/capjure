@@ -6,28 +6,17 @@
 
 
 (def *mock-mode* false)
-(def *hbase-master* "localhost:60000")
-(def *qualifier-config* {:inserts :merchant_product_id})
-
-(defn test-save [data-string]
-  (let [table (HTable. (HBaseConfiguration.) "amit_development_consumer_events")
-       batch-update (BatchUpdate. "myRow")]
-    (.put batch-update "consumer:a", (.getBytes (str data-string "00")))
-    (.put batch-update "consumer:b", (.getBytes (str data-string "01")))
-    (.put batch-update "consumer:c", (.getBytes (str data-string "02")))
-    (.commit table batch-update)))
+(def *hbase-master* "tank.cinchcorp.com:60000")
+(def *primary-keys-config* {:inserts :merchant_product_id})
 
 (declare flatten add-to-insert-batch capjure-insert)
-(defn try-to-insert [object hbase-table]
-  (try
-   (capjure-insert object hbase-table)
-   (catch Exception _ (println "exception!!"))))
-
 (defn capjure-insert [object-to-save hbase-table-name]
-  (let [flattened (flatten object-to-save)
-	table (HTable. (HBaseConfiguration.) "amit_development_consumer_events")
-	batch-update (BatchUpdate. (str (System/currentTimeMillis)))]
-    (println (add-to-insert-batch batch-update flattened))
+  (let [h-config (HBaseConfiguration.) 	
+	ignore-this (.set h-config "hbase.master", *hbase-master*)
+	table (HTable. (HBaseConfiguration.) hbase-table-name)
+	batch-update (BatchUpdate. (str (System/currentTimeMillis)))
+	flattened (flatten object-to-save)]
+    (add-to-insert-batch batch-update flattened)
     (.commit table batch-update)))
 
 (defn add-to-insert-batch [batch-update flattened-list]
@@ -37,7 +26,6 @@
       (let [first-pair (first flattened-pairs)
 	    column (first first-pair)
 	    value (last first-pair)]
-	(println "adding to batch: " column)
 	(.put batch-update column (.getBytes (str value)))
 	(recur (rest flattened-pairs))))))
 
@@ -77,7 +65,7 @@
      :else (process-strings key (to-array all)))))
 
 (defn process-maps [key maps]
-  (let [qualifier (*qualifier-config* key)]
+  (let [qualifier (*primary-keys-config* key)]
     (apply merge (map 
 		  (fn [single-map]
 		    (process-map (symbol-name key) (single-map qualifier) (dissoc single-map qualifier)))
