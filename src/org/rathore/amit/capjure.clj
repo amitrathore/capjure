@@ -34,7 +34,7 @@
   (cond
    (map? value) (prepend-to-keys key ":" value)
    (vector? value) (process-multiple key value)
-   :else {key value}))
+   :else {(symbol-name key) value}))
 
 (defn process-multiple [key values]
   (let [all (seq values)]

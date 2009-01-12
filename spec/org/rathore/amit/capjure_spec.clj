@@ -7,10 +7,16 @@
 (defn is-same-sequence [seqa seqb]
      (is (= (sort seqa) (sort seqb))))
 
-(def message-string "{\"inserts\": [{\"cinch_unit_price\": 19.95, \"html_id\": \"cinch_id_1231548881964\", \"merchant_unit_price\": 19.95, \"campaign_id\": -1, \"insert_type\": \"campaign\"}], \"session\": {\"merchant_session_id\": \"cc0bd4007dd531c031b22a4c18224e85\", \"cinch_session_id\": \"b2392df2aa5765a332208f5cbf49c13d\", \"uber_session_id\": \"e5ac21a0-8eea-e6f6-3434-369cd7909355\"}, \"active_campaigns\": [3, 4, 7, 10, 11, 13], \"api\": \"0.0.1.0\", \"consumer\": {\"email_address\": \"8fe6865c-6450-5a3b-2497-7e3a2734b7f4@visitor.cinchcorp.com\", \"kind\": \"visitor\", \"id\": 30137}}")
+(def message-string 
+"{\"active_campaigns\": [3, 4, 7, 10, 11, 13], \"consumer\": {\"kind\": \"visitor\", \"id\": 103, \"email_address\": \"f80a2173-5923-264f-e2d5-cb0f96220220@visitor.cinchcorp.com\"}, \"session\": {\"uber_session_id\": \"a96ec02e-0fd3-b030-c14a-1761ffe7d45b\", \"merchant_session_id\": \"3c0e276524dc843debaebfd9506138ee\", \"cinch_session_id\": \"42e00dc0eae2706a75eee1c1964d4d43\"}, \"api\": \"0.0.1.0\", \"inserts\": [{\"cinch_unit_price\": 36.95, \"campaign_id\": -1, \"html_id\": \"cinch_id_1231729409882\", \"merchant_product_id\": \"SS-REG\", \"merchant_unit_price\": 36.95, \"insert_type\": \"campaign\"}]}")
+
+(def old-string "{\"inserts\": [{\"cinch_unit_price\": 19.95, \"html_id\": \"cinch_id_1231548881964\", \"merchant_unit_price\": 19.95, \"campaign_id\": -1, \"insert_type\": \"campaign\"}], \"session\": {\"merchant_session_id\": \"cc0bd4007dd531c031b22a4c18224e85\", \"cinch_session_id\": \"b2392df2aa5765a332208f5cbf49c13d\", \"uber_session_id\": \"e5ac21a0-8eea-e6f6-3434-369cd7909355\"}, \"active_campaigns\": [3, 4, 7, 10, 11, 13], \"api\": \"0.0.1.0\", \"consumer\": {\"email_address\": \"8fe6865c-6450-5a3b-2497-7e3a2734b7f4@visitor.cinchcorp.com\", \"kind\": \"visitor\", \"id\": 30137}}")
 
 (def hash-object 
      (json/decode-from-str message-string))
+
+(def old-object 
+     (json/decode-from-str old-string))
 
 (deftest test-prepend-to-keys
   (let [to-prepend (hash-object :consumer)
