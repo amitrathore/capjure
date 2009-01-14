@@ -6,9 +6,8 @@
 
 
 (def *mock-mode* false)
-(def *hbase-master* "tank.cinchcorp.com:60000")
-(def *primary-keys-config* {:inserts :merchant_product_id})
-
+(def *hbase-master* "localhost:60000")
+(def *primary-keys-config* {})
 
 (declare flatten add-to-insert-batch capjure-insert)
 (defn capjure-insert [object-to-save hbase-table-name]
