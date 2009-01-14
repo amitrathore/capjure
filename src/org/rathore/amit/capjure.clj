@@ -14,10 +14,12 @@
   (let [h-config (HBaseConfiguration.) 	
 	ignore-this (.set h-config "hbase.master", *hbase-master*)
 	table (HTable. h-config hbase-table-name)
-	batch-update (BatchUpdate. (str (System/currentTimeMillis)))
+	row-id (str (System/currentTimeMillis))
+	batch-update (BatchUpdate. row-id)
 	flattened (flatten object-to-save)]
     (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)))
+    (.commit table batch-update)
+    row-id))
 
 (defn add-to-insert-batch [batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
