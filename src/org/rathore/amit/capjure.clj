@@ -90,5 +90,9 @@
 		  (process-key-value (first pair) (last pair)))
 		(seq bloated_object))))
 
-(defn hbase_table [object_name table_name column_information]
-     ())
+(defn rowcount [hbase-table-name & columns]
+  (let [h-config (HBaseConfiguration.) 	
+	_ (.set h-config "hbase.master", *hbase-master*)
+	table (HTable. h-config hbase-table-name)
+	row-results (iterator-seq (.iterator (.getScanner table (into-array columns))))]
+    (count row-results)))
