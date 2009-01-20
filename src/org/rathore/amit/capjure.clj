@@ -86,6 +86,14 @@
 		  (process-key-value (first pair) (last pair)))
 		(seq bloated_object))))
 
+(defn read-row [hbase-table-name row-id]
+  (let [table (hbase-table hbase-table-name)]
+    (.getRow table (.getBytes row-id))))
+
+(defn read-cell [hbase-table-name row-id column-name]
+  (let [row (read-row hbase-table-name row-id)]
+    (String. (.getValue (.get row (.getBytes column-name))))))
+	
 (defn rowcount [hbase-table-name & columns]
   (let [table (hbase-table hbase-table-name)
 	row-results (iterator-seq (.iterator (.getScanner table (into-array columns))))]
