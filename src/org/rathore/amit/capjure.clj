@@ -93,4 +93,11 @@
 	_ (.set h-config "hbase.master", *hbase-master*)
 	table (HTable. h-config hbase-table-name)
 	row-results (iterator-seq (.iterator (.getScanner table (into-array columns))))]
-    (count row-results)))
+    (count row-results)))  
+
+(defn delete-all [hbase-table-name column-name]
+  (let [h-config (HBaseConfiguration.) 	
+	_ (.set h-config "hbase.master", *hbase-master*)
+	table (HTable. h-config hbase-table-name)]
+    (.deleteAll table column-name)))
+	
