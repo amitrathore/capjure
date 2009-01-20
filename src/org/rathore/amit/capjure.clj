@@ -10,16 +10,14 @@
 (def *primary-keys-config* {})
 
 (declare flatten add-to-insert-batch capjure-insert)
-(defn capjure-insert [object-to-save hbase-table-name]
+(defn capjure-insert [object-to-save hbase-table-name row-id]
   (let [h-config (HBaseConfiguration.) 	
-	ignore-this (.set h-config "hbase.master", *hbase-master*)
+	_ (.set h-config "hbase.master", *hbase-master*)
 	table (HTable. h-config hbase-table-name)
-	row-id (str (System/currentTimeMillis))
-	batch-update (BatchUpdate. row-id)
+	batch-update (BatchUpdate. (str row-id))
 	flattened (flatten object-to-save)]
     (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)
-    row-id))
+    (.commit table batch-update)))    
 
 (defn add-to-insert-batch [batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
