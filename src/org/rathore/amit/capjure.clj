@@ -9,15 +9,13 @@
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
 
-(declare flatten add-to-insert-batch capjure-insert)
+(declare flatten add-to-insert-batch capjure-insert hbase-table)
 (defn capjure-insert [object-to-save hbase-table-name row-id]
-  (let [h-config (HBaseConfiguration.) 	
-	_ (.set h-config "hbase.master", *hbase-master*)
-	table (HTable. h-config hbase-table-name)
+  (let [table (hbase-table hbase-table-name)
 	batch-update (BatchUpdate. (str row-id))
 	flattened (flatten object-to-save)]
     (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)))    
+    (.commit table batch-update)))
 
 (defn add-to-insert-batch [batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
@@ -89,15 +87,16 @@
 		(seq bloated_object))))
 
 (defn rowcount [hbase-table-name & columns]
-  (let [h-config (HBaseConfiguration.) 	
-	_ (.set h-config "hbase.master", *hbase-master*)
-	table (HTable. h-config hbase-table-name)
+  (let [table (hbase-table hbase-table-name)
 	row-results (iterator-seq (.iterator (.getScanner table (into-array columns))))]
     (count row-results)))  
 
 (defn delete-all [hbase-table-name column-name]
-  (let [h-config (HBaseConfiguration.) 	
-	_ (.set h-config "hbase.master", *hbase-master*)
-	table (HTable. h-config hbase-table-name)]
+  (let [table (hbase-table hbase-table-name)]
     (.deleteAll table column-name)))
-	
+
+(defn hbase-table [hbase-table-name]
+  (let [h-config (HBaseConfiguration.) 	
+	_ (.set h-config "hbase.master", *hbase-master*)]
+    (HTable. h-config hbase-table-name)))
+  
