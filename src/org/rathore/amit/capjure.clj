@@ -9,7 +9,7 @@
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
 
-(declare flatten add-to-insert-batch capjure-insert hbase-table)
+(declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 (defn capjure-insert [object-to-save hbase-table-name row-id]
   (let [table (hbase-table hbase-table-name)
 	batch-update (BatchUpdate. (str row-id))
@@ -85,6 +85,34 @@
 		(fn [pair] 
 		  (process-key-value (first pair) (last pair)))
 		(seq bloated_object))))
+
+(declare read-as-hash cell-value-as-string hydrate-pair)
+(defn hydrate [flattened-object]
+  (let [hydrated {}
+	flat-keys (to-array (keys flattened-object))]
+    (areduce flat-keys idx ret hydrated
+	     (hydrate-pair (aget flat-keys idx) flattened-object hydrated))))
+
+(defn hydrate-pair [key-name flattened hydrated]
+  (let [value (.trim (str (flattened key-name)))
+	key-tokens (seq (.split key-name ":"))
+	column-family (first key-tokens)
+	column-name (last key-tokens)]
+  (println "key, value: " key-name ", " value)
+  ;(println "col-fam, col-name, value, same: " column-family ", " column-name ", " value (str (= column-name value)))
+  (cond
+   (= column-name value) (assoc hydrated column-name value))))
+
+(defn read-as-hash [hbase-table-name row-id]
+  (let [row (read-row hbase-table-name row-id)
+	keyset (map #(String. %) (seq (.keySet row)))
+	columns-and-values (map (fn [column-name]
+				  {column-name (cell-value-as-string row column-name)})
+				keyset)]
+    (apply merge columns-and-values)))
+
+(defn cell-value-as-string [row column-name]
+  (String. (.getValue (.get row (.getBytes column-name)))))
 
 (defn read-row [hbase-table-name row-id]
   (let [table (hbase-table hbase-table-name)]

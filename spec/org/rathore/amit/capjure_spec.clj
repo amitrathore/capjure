@@ -73,7 +73,8 @@
     (is (= (count all-keys) 20))
     (is (= (flattened "api:") "0.0.1.0"))))
 
-(defn run-all []
-  (binding [*hbase-master* "tank.cinchcorp.com:60000"
-            *primary-keys-config* {:inserts :merchant_product_id}]
-    (run-tests)))
+(deftest test-hydrate
+  (let [flattened (flatten hash-object)
+	hydrated (hydrate flattened)]
+    (println "flattened: " flattened)
+    (println "hydrated: " hydrated)))
