@@ -86,38 +86,69 @@
 		  (process-key-value (first pair) (last pair)))
 		(seq bloated_object))))
 
-(declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration)
+(declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
+
+(defn all-primary-keys []
+  (map #(symbol-name %) (keys *primary-keys-config*)))
 
 (defn is-from-primary-keys [key-name]
-  (let [key-names (map #(symbol-name %) (keys *primary-keys-config*))
-	key-name-str (symbol-name key-name)]
-    (some #(.startsWith key-name-str %) key-names)))
+  (let [key-name-str (symbol-name key-name)]
+    (some #(.startsWith key-name-str %) (all-primary-keys))))
+
+(defn primary-key [column-family]
+  (first (filter #(.startsWith column-family (str %)) (all-primary-keys))))
+
+(defn column-name-empty? [key-name]
+  (= 1 (count (.split key-name ":"))))
+
+(defn collapse-for-hydration [mostly-hydrated]
+  (let [primary-keys (to-array (all-primary-keys))]
+    (areduce primary-keys idx ret mostly-hydrated
+	     (let [primary-key (symbol-name (aget primary-keys idx))
+		   inner-map (ret primary-key)
+		   inner-values (apply vector (vals inner-map))]
+	       (println "processing for pk, inner-values: " primary-key inner-values)
+	       (assoc ret primary-key inner-values)))))
 
 (defn hydrate [flattened-object]
   (let [flat-keys (to-array (keys flattened-object))]
-    (areduce flat-keys idx ret {}
-	     (hydrate-pair (aget flat-keys idx) flattened-object ret))))
+    (collapse-for-hydration (areduce flat-keys idx ret {}
+				     (hydrate-pair (aget flat-keys idx) flattened-object ret)))))
 
 (defn hydrate-pair [key-name flattened hydrated]
   (let [value (.trim (str (flattened key-name)))
 	key-tokens (seq (.split key-name ":"))
 	column-family (first key-tokens)
 	column-name (last key-tokens)]
-    (println "analyzing key, cf: " key-name column-name)
     (cond
      (= column-name value) (has-many-strings-hydration hydrated column-family value)
-					;(is-from-primary-keys column-family)) (has-many-objects-hydration hydrated column-family column-name value)
-     (empty? column-name) (has-one-string-hydration hydrated column-family value)
-     :else hydrated)))
+     (is-from-primary-keys column-family) (has-many-objects-hydration hydrated column-family column-name value)
+     (column-name-empty? key-name) (has-one-string-hydration hydrated column-family value)
+     :else (has-one-object-hydration hydrated column-family column-name value))))
 
 (defn has-one-string-hydration [hydrated column-family value]
   (assoc hydrated column-family value))
+
+(defn has-one-object-hydration [hydrated column-family column-name value]
+  (let [value-map (or (hydrated column-family) {})]
+    (assoc hydrated column-family
+	   (assoc value-map column-name value))))
 
 (defn has-many-strings-hydration [hydrated column-family value]
   (let [old-value (hydrated column-family)]
     (cond 
      (nil? old-value) (assoc hydrated column-family [value])
      :else (assoc hydrated column-family (apply vector (seq (cons value old-value)))))))
+
+(defn has-many-objects-hydration [hydrated column-family column-name value]
+  (let [outer-key (primary-key column-family)
+	inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
+	primary-key-name (*primary-keys-config* outer-key)
+	inner-map (or (hydrated outer-key) {})
+	inner-object (or (inner-map column-name) {(symbol-name (*primary-keys-config* (keyword outer-key))) column-name})]
+    (assoc hydrated outer-key 
+	   (assoc inner-map column-name 
+		  (assoc inner-object inner-key value)))))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [row (read-row hbase-table-name row-id)
