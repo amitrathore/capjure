@@ -81,7 +81,6 @@
 	merchant (hydrated "merchant")
 	inserts (hydrated "inserts")
 	insert (first inserts)]
-    (println "hydrated: " hydrated)
     (is-same-sequence (hydrated "active_campaigns") [3 4 7 10 11 13])
     (is (= (hydrated "api") "0.0.1.0"))
     (is (= (count inserts) 1))
