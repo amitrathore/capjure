@@ -107,8 +107,9 @@
 	     (let [primary-key (symbol-name (aget primary-keys idx))
 		   inner-map (ret primary-key)
 		   inner-values (apply vector (vals inner-map))]
-	       (println "processing for pk, inner-values: " primary-key inner-values)
-	       (assoc ret primary-key inner-values)))))
+	       (cond
+		(empty? inner-values) ret
+		:else (assoc ret primary-key inner-values))))))
 
 (defn hydrate [flattened-object]
   (let [flat-keys (to-array (keys flattened-object))]
