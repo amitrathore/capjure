@@ -86,22 +86,38 @@
 		  (process-key-value (first pair) (last pair)))
 		(seq bloated_object))))
 
-(declare read-as-hash cell-value-as-string hydrate-pair)
+(declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration)
+
+(defn is-from-primary-keys [key-name]
+  (let [key-names (map #(symbol-name %) (keys *primary-keys-config*))
+	key-name-str (symbol-name key-name)]
+    (some #(.startsWith key-name-str %) key-names)))
+
 (defn hydrate [flattened-object]
-  (let [hydrated {}
-	flat-keys (to-array (keys flattened-object))]
-    (areduce flat-keys idx ret hydrated
-	     (hydrate-pair (aget flat-keys idx) flattened-object hydrated))))
+  (let [flat-keys (to-array (keys flattened-object))]
+    (areduce flat-keys idx ret {}
+	     (hydrate-pair (aget flat-keys idx) flattened-object ret))))
 
 (defn hydrate-pair [key-name flattened hydrated]
   (let [value (.trim (str (flattened key-name)))
 	key-tokens (seq (.split key-name ":"))
 	column-family (first key-tokens)
 	column-name (last key-tokens)]
-  (println "key, value: " key-name ", " value)
-  ;(println "col-fam, col-name, value, same: " column-family ", " column-name ", " value (str (= column-name value)))
-  (cond
-   (= column-name value) (assoc hydrated column-name value))))
+    (println "analyzing key, cf: " key-name column-name)
+    (cond
+     (= column-name value) (has-many-strings-hydration hydrated column-family value)
+					;(is-from-primary-keys column-family)) (has-many-objects-hydration hydrated column-family column-name value)
+     (empty? column-name) (has-one-string-hydration hydrated column-family value)
+     :else hydrated)))
+
+(defn has-one-string-hydration [hydrated column-family value]
+  (assoc hydrated column-family value))
+
+(defn has-many-strings-hydration [hydrated column-family value]
+  (let [old-value (hydrated column-family)]
+    (cond 
+     (nil? old-value) (assoc hydrated column-family [value])
+     :else (assoc hydrated column-family (apply vector (seq (cons value old-value)))))))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [row (read-row hbase-table-name row-id)

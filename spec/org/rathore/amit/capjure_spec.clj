@@ -4,13 +4,17 @@
 (require '(org.danlarkin [json :as json]))
 (use 'org.rathore.amit.capjure)
 
+(defn stringified [aseq]
+  (map #(str %) aseq))
+
 (defn is-same-sequence [seqa seqb]
-     (is (= (sort seqa) (sort seqb))))
+     (is (= (sort (stringified seqa)) (sort (stringified seqb)))))
+
+  
+
 
 (def message-string "{\"merchant\": {\"id\": 11, \"name\": \"portable chairs\"}, \"active_campaigns\": [3, 4, 7, 10, 11, 13], \"consumer\": {\"kind\": \"visitor\", \"id\": 103, \"email_address\": \"f80a2173-5923-264f-e2d5-cb0f96220220@visitor.cinchcorp.com\"}, \"session\": {\"uber_session_id\": \"a96ec02e-0fd3-b030-c14a-1761ffe7d45b\", \"merchant_session_id\": \"3c0e276524dc843debaebfd9506138ee\", \"cinch_session_id\": \"42e00dc0eae2706a75eee1c1964d4d43\"}, \"api\": \"0.0.1.0\", \"inserts\": [{\"cinch_unit_price\": 36.95, \"campaign_id\": -1, \"html_id\": \"cinch_id_1231729409882\", \"merchant_product_id\": \"SS-REG\", \"merchant_unit_price\": 36.95, \"insert_type\": \"campaign\"}]}")
-
-(def hash-object 
-     (json/decode-from-str message-string))
+(def hash-object (json/decode-from-str message-string))
 
 (deftest test-prepend-to-keys
   (let [to-prepend (hash-object :consumer)
@@ -76,5 +80,5 @@
 (deftest test-hydrate
   (let [flattened (flatten hash-object)
 	hydrated (hydrate flattened)]
-    (println "flattened: " flattened)
-    (println "hydrated: " hydrated)))
+    (println "hydrated: " hydrated)
+    (is-same-sequence (hydrated "active_campaigns") [3 4 7 10 11 13])))
