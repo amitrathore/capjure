@@ -1,3 +1,5 @@
+(ns org.rathore.amit.capjure-init)
+
 (defstruct key-config :qualifier :functor)
 
 (defn config-for [key-name qualifier functor]

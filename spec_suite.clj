@@ -2,7 +2,7 @@
 (load-file "spec/org/rathore/amit/capjure_spec.clj")
 
 (in-ns 'capjure-spec)
-(load-file "src/org/rathore/amit/init_util.clj")
+(use 'org.rathore.amit.capjure-init)
 (import '(java.net URLEncoder URLDecoder))
 
 (def encoders (config-keys
