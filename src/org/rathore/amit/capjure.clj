@@ -4,10 +4,27 @@
 	'(org.apache.hadoop.hbase.client HTable Scanner)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell))
 
-
 (def *mock-mode* false)
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
+
+(declare symbol-name)
+(defn encoding-keys []
+  (*primary-keys-config* :encode))
+(defn decoding-keys []
+  (*primary-keys-config* :decode))
+(defn qualifier-for [key-name]
+  (((encoding-keys) key-name) :qualifier))
+(defn encoding-functor-for [key-name]
+  (((encoding-keys) key-name) :functor))
+(defn all-primary-keys []
+  (map #(symbol-name %) (keys (encoding-keys))))
+(defn primary-key [column-family]
+  (first (filter #(.startsWith column-family (str %)) (all-primary-keys))))
+(defn decoding-functor-for [key-name]
+  (((decoding-keys) (keyword key-name)) :functor))
+(defn decode-with-key [key-name value]
+  ((decoding-functor-for key-name) value))
 
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 (defn capjure-insert [object-to-save hbase-table-name row-id]
@@ -63,10 +80,11 @@
      :else (process-strings key (to-array all)))))
 
 (defn process-maps [key maps]
-  (let [qualifier (*primary-keys-config* key)]
+  (let [qualifier (qualifier-for key)
+	encoding-functor (encoding-functor-for key)]
     (apply merge (map 
 		  (fn [single-map]
-		    (process-map (symbol-name key) (single-map qualifier) (dissoc single-map qualifier)))
+		    (process-map (symbol-name key) (encoding-functor single-map) (dissoc single-map qualifier)))
 		  maps))))
 
 (defn process-map [initial-prefix final-prefix single-map]
@@ -87,16 +105,9 @@
 		(seq bloated_object))))
 
 (declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
-
-(defn all-primary-keys []
-  (map #(symbol-name %) (keys *primary-keys-config*)))
-
 (defn is-from-primary-keys [key-name]
   (let [key-name-str (symbol-name key-name)]
     (some #(.startsWith key-name-str %) (all-primary-keys))))
-
-(defn primary-key [column-family]
-  (first (filter #(.startsWith column-family (str %)) (all-primary-keys))))
 
 (defn column-name-empty? [key-name]
   (= 1 (count (.split key-name ":"))))
@@ -144,9 +155,9 @@
 (defn has-many-objects-hydration [hydrated column-family column-name value]
   (let [outer-key (primary-key column-family)
 	inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
-	primary-key-name (*primary-keys-config* outer-key)
+	primary-key-name (qualifier-for (keyword outer-key))
 	inner-map (or (hydrated outer-key) {})
-	inner-object (or (inner-map column-name) {(symbol-name (*primary-keys-config* (keyword outer-key))) column-name})]
+	inner-object (or (inner-map column-name) {(symbol-name primary-key-name) (decode-with-key outer-key column-name)})]
     (assoc hydrated outer-key 
 	   (assoc inner-map column-name 
 		  (assoc inner-object inner-key value)))))
@@ -183,4 +194,3 @@
   (let [h-config (HBaseConfiguration.) 	
 	_ (.set h-config "hbase.master", *hbase-master*)]
     (HTable. h-config hbase-table-name)))
-  
