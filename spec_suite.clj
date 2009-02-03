@@ -1,8 +1,8 @@
 (use 'clojure.contrib.test-is)
-(import '(java.net URLEncoder URLDecoder))
 (load-file "spec/org/rathore/amit/capjure_spec.clj")
 
 (in-ns 'capjure-spec)
+(import '(java.net URLEncoder URLDecoder))
 (println "**************** running tests ******************")
 
 (defstruct key-config :qualifier :functor)
