@@ -180,10 +180,14 @@
 (defn read-cell [hbase-table-name row-id column-name]
   (let [row (read-row hbase-table-name row-id)]
     (String. (.getValue (.get row (.getBytes column-name))))))
+
+(defn table-iterator [hbase-table-name & columns]
+  (let [table (hbase-table hbase-table-name)]
+	(iterator-seq (.iterator (.getScanner table (into-array columns))))))  
 	
 (defn rowcount [hbase-table-name & columns]
   (let [table (hbase-table hbase-table-name)
-	row-results (iterator-seq (.iterator (.getScanner table (into-array columns))))]
+	row-results (table-iterator table (into-array columns))]
     (count row-results)))  
 
 (defn delete-all [hbase-table-name column-name]
