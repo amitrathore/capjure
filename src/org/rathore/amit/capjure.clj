@@ -1,7 +1,7 @@
 (ns org.rathore.amit.capjure)
 
 (import '(org.apache.hadoop.hbase HBaseConfiguration)
-	'(org.apache.hadoop.hbase.client HTable Scanner)
+	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell))
 
 (def *mock-mode* false)
@@ -192,7 +192,15 @@
   (let [table (hbase-table hbase-table-name)]
     (.deleteAll table column-name)))
 
-(defn hbase-table [hbase-table-name]
+(defn hbase-config []
   (let [h-config (HBaseConfiguration.) 	
 	_ (.set h-config "hbase.master", *hbase-master*)]
+    h-config))
+
+(defn drop-table [hbase-table-name]
+  (let [admin (HBaseAdmin. (hbase-config))]
+    (.deleteTable hbase-table-name)))
+
+(defn hbase-table [hbase-table-name]
+  (let [h-config (hbase-config)]
     (HTable. h-config hbase-table-name)))
