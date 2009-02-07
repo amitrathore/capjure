@@ -1,6 +1,6 @@
 (ns org.rathore.amit.capjure)
 
-(import '(org.apache.hadoop.hbase HBaseConfiguration)
+(import '(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell))
 
@@ -197,7 +197,13 @@
 	_ (.set h-config "hbase.master", *hbase-master*)]
     h-config))
 
-(defn drop-table [hbase-table-name]
+(defn create-hbase-table [table-name & column-families]
+  (let [desc (HTableDescriptor. table-name)
+	_ (doall (map #(.addFamily desc (HColumnDescriptor. %)) column-families))
+	admin (HBaseAdmin. (hbase-config))]
+    (.createTable admin desc)))
+
+(defn drop-hbase-table [hbase-table-name]
   (let [admin (HBaseAdmin. (hbase-config))]
     (.deleteTable hbase-table-name)))
 
