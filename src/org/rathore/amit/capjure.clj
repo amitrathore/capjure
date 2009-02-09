@@ -170,6 +170,10 @@
 				keyset)]
     (apply merge columns-and-values)))
 
+(defn read-as-hydrated [hbase-table-name row-id]
+  (let [as-hash (read-as-hash hbase-table-name row-id)]
+    (hydrate as-hash)))	
+
 (defn cell-value-as-string [row column-name]
   (String. (.getValue (.get row (.getBytes column-name)))))
 
