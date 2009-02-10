@@ -174,6 +174,10 @@
   (let [as-hash (read-as-hash hbase-table-name row-id)]
     (hydrate as-hash)))	
 
+(defn row-exists? [hbase-table-name row-id-string]
+  (let [table (hbase-table hbase-table-name)]
+    (.exists table (.getBytes row-id-string))))	
+
 (defn cell-value-as-string [row column-name]
   (String. (.getValue (.get row (.getBytes column-name)))))
 
