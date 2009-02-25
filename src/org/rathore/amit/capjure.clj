@@ -197,6 +197,14 @@
   (let [table (hbase-table hbase-table-name)]
     (iterator-seq (.iterator (.getScanner table (into-array columns))))))
 
+(defn table-scanner
+  ([hbase-table-name columns]
+     (let [table (hbase-table hbase-table-name)]
+       (.getScanner table (into-array columns))))
+  ([hbase-table-name columns start-row-string]
+     (let [table (hbase-table hbase-table-name)]
+       (.getScanner table (into-array columns) start-row-string))))
+
 (defn rowcount [hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
 
