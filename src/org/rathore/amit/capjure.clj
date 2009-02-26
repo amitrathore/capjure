@@ -162,13 +162,16 @@
 	   (assoc inner-map column-name 
 		  (assoc inner-object inner-key value)))))
 
-(defn read-as-hash [hbase-table-name row-id]
-  (let [row (read-row hbase-table-name row-id)
-	keyset (map #(String. %) (seq (.keySet row)))
+(defn hydrate-hbase-object [hbase-row]
+  (let [keyset (map #(String. %) (seq (.keySet hbase-row)))
 	columns-and-values (map (fn [column-name]
-				  {column-name (cell-value-as-string row column-name)})
+				  {column-name (cell-value-as-string hbase-row column-name)})
 				keyset)]
-    (apply merge columns-and-values)))
+    (apply merge columns-and-values)))  
+
+(defn read-as-hash [hbase-table-name row-id]
+  (let [row (read-row hbase-table-name row-id)]
+    (hydrate-hbase-object row)))
 
 (defn read-as-hydrated [hbase-table-name row-id]
   (let [as-hash (read-as-hash hbase-table-name row-id)]
