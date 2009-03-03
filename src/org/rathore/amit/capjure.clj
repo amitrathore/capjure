@@ -14,9 +14,9 @@
 (defn decoding-keys []
   (*primary-keys-config* :decode))
 (defn qualifier-for [key-name]
-  (((encoding-keys) key-name) :qualifier))
+  (((encoding-keys) (keyword key-name)) :qualifier))
 (defn encoding-functor-for [key-name]
-  (((encoding-keys) key-name) :functor))
+  (((encoding-keys) (keyword key-name)) :functor))
 (defn all-primary-keys []
   (map #(symbol-name %) (keys (encoding-keys))))
 (defn primary-key [column-family]
@@ -162,7 +162,7 @@
 	   (assoc inner-map column-name 
 		  (assoc inner-object inner-key value)))))
 
-(defn hydrate-hbase-object [hbase-row]
+(defn hbase-object-as-hash [hbase-row]
   (let [keyset (map #(String. %) (seq (.keySet hbase-row)))
 	columns-and-values (map (fn [column-name]
 				  {column-name (cell-value-as-string hbase-row column-name)})
@@ -171,7 +171,7 @@
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [row (read-row hbase-table-name row-id)]
-    (hydrate-hbase-object row)))
+    (hbase-object-as-hash row)))
 
 (defn read-as-hydrated [hbase-table-name row-id]
   (let [as-hash (read-as-hash hbase-table-name row-id)]
