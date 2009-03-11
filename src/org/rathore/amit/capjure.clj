@@ -188,6 +188,10 @@
   (let [table (hbase-table hbase-table-name)]
     (.getRow table (.getBytes row-id))))
 
+(defn read-rows [hbase-table-name row-id-list]
+  (let [table (hbase-table hbase-table-name)]
+    (map #(.getRow table %) row-id-list)))
+
 (defn read-all-versions [hbase-table-name row-id-string number-of-versions]
   (let [table (hbase-table hbase-table-name)]
     (.getRow table row-id-string number-of-versions)))	
