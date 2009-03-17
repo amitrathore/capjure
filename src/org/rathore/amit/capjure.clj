@@ -197,6 +197,11 @@
   (let [table (hbase-table hbase-table-name)]
     (.getRow table row-id-string number-of-versions)))	
 
+(defn read-all-versions-as-strings [hbase-table-name row-id-string number-of-versions column-family-as-string]
+  (let [table (hbase-table hbase-table-name)
+	all-versions (.getRow table row-id-string number-of-versions)]
+    (map #(String. (.getValue %)) (iterator-seq (.iterator (.get all-versions column-family-as-string))))))
+
 (defn read-cell [hbase-table-name row-id column-name]
   (let [row (read-row hbase-table-name row-id)]
     (String. (.getValue (.get row (.getBytes column-name))))))
