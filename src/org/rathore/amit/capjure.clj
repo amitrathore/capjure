@@ -221,9 +221,10 @@
 (defn rowcount [hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
 
-(defn delete-all [hbase-table-name & row-names-as-string]
+(defn delete-all [hbase-table-name & row-ids-as-strings]
   (let [table (hbase-table hbase-table-name)]
-    (map #(.deleteAll table %) row-names-as-string)))
+    (doseq [row-id row-ids-as-strings]
+      (.deleteAll table row-id))))
 
 (defn hbase-config []
   (let [h-config (HBaseConfiguration.) 	
