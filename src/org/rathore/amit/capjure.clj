@@ -14,16 +14,15 @@
 (defn decoding-keys []
   (*primary-keys-config* :decode))
 (defn qualifier-for [key-name]
-  (((encoding-keys) key-name) :qualifier))
+  (((encoding-keys) (keyword key-name)) :qualifier))
 (defn encoding-functor-for [key-name]
-  (((encoding-keys) key-name) :functor))
+  (((encoding-keys) (keyword key-name)) :functor))
 (defn all-primary-keys []
-  ;(map #(symbol-name %) (keys (encoding-keys))))
-  (keys (encoding-keys)))
+  (map #(symbol-name %) (keys (encoding-keys))))
 (defn primary-key [column-family]
   (first (filter #(.startsWith column-family (str %)) (all-primary-keys))))
 (defn decoding-functor-for [key-name]
-  (((decoding-keys) key-name) :functor))
+  (((decoding-keys) (keyword key-name)) :functor))
 (defn decode-with-key [key-name value]
   ((decoding-functor-for key-name) value))
 
@@ -156,7 +155,7 @@
 (defn has-many-objects-hydration [hydrated column-family column-name value]
   (let [outer-key (primary-key column-family)
 	inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
-	primary-key-name (qualifier-for outer-key)
+	primary-key-name (qualifier-for (keyword outer-key))
 	inner-map (or (hydrated outer-key) {})
 	inner-object (or (inner-map column-name) {(symbol-name primary-key-name) (decode-with-key outer-key column-name)})]
     (assoc hydrated outer-key 
