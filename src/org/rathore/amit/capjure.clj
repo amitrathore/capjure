@@ -4,29 +4,37 @@
 	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell))
 
-(def *mock-mode* false)
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
 
 (declare symbol-name)
+
 (defn encoding-keys []
   (*primary-keys-config* :encode))
+
 (defn decoding-keys []
   (*primary-keys-config* :decode))
+
 (defn qualifier-for [key-name]
   (((encoding-keys) (keyword key-name)) :qualifier))
+
 (defn encoding-functor-for [key-name]
   (((encoding-keys) (keyword key-name)) :functor))
+
 (defn all-primary-keys []
   (map #(symbol-name %) (keys (encoding-keys))))
+
 (defn primary-key [column-family]
   (first (filter #(.startsWith column-family (str %)) (all-primary-keys))))
+
 (defn decoding-functor-for [key-name]
   (((decoding-keys) (keyword key-name)) :functor))
+
 (defn decode-with-key [key-name value]
   ((decoding-functor-for key-name) value))
 
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
+
 (defn capjure-insert [object-to-save hbase-table-name row-id]
   (let [table (hbase-table hbase-table-name)
 	batch-update (BatchUpdate. (str row-id))
@@ -36,8 +44,7 @@
 
 (defn add-to-insert-batch [batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
-    (if (empty? flattened-pairs)
-      :done
+    (if (not (empty? flattened-pairs))
       (let [first-pair (first flattened-pairs)
 	    column (first first-pair)
 	    value (last first-pair)]
@@ -45,9 +52,10 @@
 	(recur (rest flattened-pairs))))))
 
 (defn symbol-name [prefix]
-  (cond
-   (keyword? prefix) (name prefix)
-   :else (str prefix)))
+  (if
+   (keyword? prefix) 
+     (name prefix)
+     (str prefix)))
 
 (defn new-key [part1 separator part2]
   (str (symbol-name part1) separator (symbol-name part2)))
@@ -75,9 +83,10 @@
 
 (defn process-multiple [key values]
   (let [all (seq values)]
-    (cond
-     (map? (first all)) (process-maps key all)
-     :else (process-strings key (to-array all)))))
+    (if
+     (map? (first all)) 
+     (process-maps key all)
+     (process-strings key (to-array all)))))
 
 (defn process-maps [key maps]
   (let [qualifier (qualifier-for key)
@@ -118,9 +127,9 @@
 	     (let [primary-key (symbol-name (aget primary-keys idx))
 		   inner-map (ret primary-key)
 		   inner-values (apply vector (vals inner-map))]
-	       (cond
-		(empty? inner-values) ret
-		:else (assoc ret primary-key inner-values))))))
+	       (if (empty? inner-values) 
+		 ret
+		(assoc ret primary-key inner-values))))))
 
 (defn hydrate [flattened-object]
   (let [flat-keys (to-array (keys flattened-object))]
@@ -148,9 +157,9 @@
 
 (defn has-many-strings-hydration [hydrated column-family value]
   (let [old-value (hydrated column-family)]
-    (cond 
-     (nil? old-value) (assoc hydrated column-family [value])
-     :else (assoc hydrated column-family (apply vector (seq (cons value old-value)))))))
+    (if (nil? old-value) 
+      (assoc hydrated column-family [value])
+      (assoc hydrated column-family (apply vector (seq (cons value old-value)))))))
 
 (defn has-many-objects-hydration [hydrated column-family column-name value]
   (let [outer-key (primary-key column-family)
