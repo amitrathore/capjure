@@ -182,13 +182,11 @@
 				keyset)]
     (apply merge columns-and-values)))  
 
+(defn to-strings [array-of-byte-arrays]
+  (map #(String. %) array-of-byte-arrays))
 
-(defn all-versions-of-data-from-hbase-row [hbase-row]
-  (let [available-columns (keys (.entrySet hbase-row))
-	pair-creator (fn [col cell] {col cell})
-	col-cell-pairs (map #(pair-creator % (.get hbase-row %)) available-columns)
-	cell-values-stringify (fn [c] (map #(String. (.getValue %)) (iterator-seq (.iterator c))))]
-    (map #(pair-creator (first %) (cell-values-stringify (last %))) col-cell-pairs)))
+(defn column-name-from [column-family-colon-column-name]
+  (last (to-strings (.split (String. column-family-colon-column-name) ":"))))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [row (read-row hbase-table-name row-id)]
@@ -213,29 +211,29 @@
   (let [table (hbase-table hbase-table-name)]
     (map #(.getRow table %) row-id-list)))
 
+(declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
   (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (InclusiveStopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
-
-
-;(defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
-;  (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
-;	row-ids (map #(.getRow %) rows-between)
-;	rows (map #(read-all-versions hbase-table-name % 100000) row-ids)]
-    
-    
-
-;    (map #(read-all-versions-as-strings hbase-table-name % 100000 column-family-as-string) row-ids)))
-
-(defn read-all-versions [hbase-table-name row-id-string number-of-versions]
+(defn read-all-versions 
+  ([hbase-table-name row-id-string number-of-versions]
+     (let [table (hbase-table hbase-table-name)]
+       (.getRow table row-id-string number-of-versions)))
+  ([hbase-table-name row-id-string column-family-as-string number-of-versions]
   (let [table (hbase-table hbase-table-name)]
-    (.getRow table row-id-string number-of-versions)))	
+    (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
 
-(defn read-all-versions-as-strings [hbase-table-name row-id-string number-of-versions column-family-as-string]
-  (let [table (hbase-table hbase-table-name)
-	all-versions (.getRow table row-id-string number-of-versions)]
-    (map #(String. (.getValue %)) (iterator-seq (.iterator (.get all-versions column-family-as-string))))))
+(defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
+  (let [hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
+	available-columns (keys (.entrySet hbase-row))
+	cell-versions-collector (fn [col-name] { (column-name-from col-name) (map #(String. (.getValue %)) (iterator-seq (.iterator (.get hbase-row col-name)))) })]
+    (apply merge (map cell-versions-collector available-columns))))
+
+(defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
+  (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
+	row-ids (map #(String. (.getRow %)) rows-between)]
+    (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
   (let [row (read-row hbase-table-name row-id)]
