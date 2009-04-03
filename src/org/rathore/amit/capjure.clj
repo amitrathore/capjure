@@ -2,7 +2,8 @@
 
 (import '(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
-	'(org.apache.hadoop.hbase.io BatchUpdate Cell))
+	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
+	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter))
 
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
@@ -171,12 +172,23 @@
 	   (assoc inner-map column-name 
 		  (assoc inner-object inner-key value)))))
 
+(defn columns-from-hbase-row-result [hbase-row]
+  (map #(String. %) (seq (.keySet hbase-row))))
+
 (defn hbase-object-as-hash [hbase-row]
-  (let [keyset (map #(String. %) (seq (.keySet hbase-row)))
+  (let [keyset (columns-from-hbase-row-result hbase-row)
 	columns-and-values (map (fn [column-name]
 				  {column-name (cell-value-as-string hbase-row column-name)})
 				keyset)]
     (apply merge columns-and-values)))  
+
+
+(defn all-versions-of-data-from-hbase-row [hbase-row]
+  (let [available-columns (keys (.entrySet hbase-row))
+	pair-creator (fn [col cell] {col cell})
+	col-cell-pairs (map #(pair-creator % (.get hbase-row %)) available-columns)
+	cell-values-stringify (fn [c] (map #(String. (.getValue %)) (iterator-seq (.iterator c))))]
+    (map #(pair-creator (first %) (cell-values-stringify (last %))) col-cell-pairs)))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [row (read-row hbase-table-name row-id)]
@@ -201,6 +213,21 @@
   (let [table (hbase-table hbase-table-name)]
     (map #(.getRow table %) row-id-list)))
 
+(defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
+  (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (InclusiveStopRowFilter. (.getBytes end-row-id)))]
+    (iterator-seq (.iterator scanner))))
+
+
+
+;(defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
+;  (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
+;	row-ids (map #(.getRow %) rows-between)
+;	rows (map #(read-all-versions hbase-table-name % 100000) row-ids)]
+    
+    
+
+;    (map #(read-all-versions-as-strings hbase-table-name % 100000 column-family-as-string) row-ids)))
+
 (defn read-all-versions [hbase-table-name row-id-string number-of-versions]
   (let [table (hbase-table hbase-table-name)]
     (.getRow table row-id-string number-of-versions)))	
@@ -224,7 +251,11 @@
        (.getScanner table (into-array columns))))
   ([hbase-table-name columns start-row-string]
      (let [table (hbase-table hbase-table-name)]
-       (.getScanner table (into-array columns) start-row-string))))
+       (.getScanner table (into-array columns) start-row-string)))
+  ([hbase-table-name columns start-row-string row-filter]
+     (let [table (hbase-table hbase-table-name)
+	   columns-to-scan (into-array (map #(.getBytes %) columns))]
+       (.getScanner table columns-to-scan start-row-string row-filter))))
 
 (defn rowcount [hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
