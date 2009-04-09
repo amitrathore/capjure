@@ -255,6 +255,11 @@
 	   columns-to-scan (into-array (map #(.getBytes %) columns))]
        (.getScanner table columns-to-scan start-row-string row-filter))))
 
+(defn next-row-id [hbase-table-name column-to-use row-id]
+  (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
+	_ (.next scanner)]
+    (String. (.getRow (.next scanner)))))
+
 (defn rowcount [hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
 
