@@ -268,6 +268,11 @@
     (doseq [row-id row-ids-as-strings]
       (.deleteAll table row-id))))
 
+(defn column-families-for [hbase-table-name]
+  (let [table (hbase-table hbase-table-name)
+	table-descriptor (.getTableDescriptor table)]
+    (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
+
 (defn hbase-config []
   (let [h-config (HBaseConfiguration.) 	
 	_ (.set h-config "hbase.master", *hbase-master*)]
