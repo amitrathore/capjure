@@ -284,6 +284,9 @@
 	admin (HBaseAdmin. (hbase-config))]
     (.createTable admin desc)))
 
+(defn clone-table [new-hbase-table-name from-hbase-table-name]
+  (apply create-hbase-table new-hbase-table-name (column-families-for from-hbase-table-name)))
+
 (defn drop-hbase-table [hbase-table-name]
   (let [admin (HBaseAdmin. (hbase-config))]
     (.deleteTable hbase-table-name)))
