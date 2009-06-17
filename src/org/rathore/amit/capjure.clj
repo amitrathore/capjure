@@ -282,7 +282,7 @@
   (let [desc (HTableDescriptor. table-name)
 	_ (doall (map #(.addFamily desc (HColumnDescriptor. %)) column-families))
 	admin (HBaseAdmin. (hbase-config))]
-    (.createTable admin desc)))
+    (.createTableAsync admin desc)))
 
 (defn clone-table [new-hbase-table-name from-hbase-table-name]
   (apply create-hbase-table new-hbase-table-name (column-families-for from-hbase-table-name)))
