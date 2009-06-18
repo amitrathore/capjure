@@ -1,0 +1,131 @@
+h1. capjure
+
+capjure is a persistence helper for HBase. It is written in the Clojure language, and supports persisting of native hash-maps. The way capjure works is to shred the contents of the hash-map being saved into pieces, based on the keys of the hash-map. Each piece is then mapped to a cell in HBase - the <column-family:column-name> is picked based on the map's keys and some capjure configuration. 
+
+This is best illustrated through examples - see below.
+
+Contributions are welcome, as are recommendations for how to improve things.
+
+h2. Usage
+
+These are the things you need to do to get capjure working - 
+
+ * include capjure on the classpath
+ * decide on values for two vars - the first being: * hbase-master * and the second: * primary-keys-config * (no spaces, I put them in there to avoid textile)
+ * set up a binding form for all capjure related calls - bind the above two vars within it
+
+h3. hbase-master
+
+This var should be bound to a string containing the hostname and port of the HBase master that you want to store objects into. The format is like this examples -
+
+<pre><code>"http://hbase-master.domain.com:60000"</pre></code>
+
+h3. primary-keys-config
+
+This one is a little more complicated. This configuration object is used when capjure tries to persist a nested hash-map. If you don't have this use-case, you can skip this.
+
+primary-keys-config is basically a clojure map with two keys - :encoders, and :decoders. Each represents an object defined by the capjure provided function *config-keys*. Encoders are used to prepare values for persistence into HBase, while decoders are used to reverse the operation during reads out of HBase.
+
+h4. config-keys
+
+This function takes multiple config objects (each for one key) - and these config objects are created using the *config-for* helper function.
+
+h4. config-for 
+
+This is where all the work happen. config-for accepts three parameters, the first two are - a _top-level key_ and _a qualifier key_ (think of this as an inner key, in case of a nested hash-map where the value of a top-level key is itself another hash-map). 
+
+h4. encoders
+
+The third paramter is a function of one argument. What this function does depends on whether config-for is being used to specify configuration for an encoder or a decoder. In the case of an encoder, the argument that this function will be passed will be the value of the key. The return value of the function is used as the column-name of the HBase table during storage. (The outer-key, itself, is used as the column-family). This return value should use the value of the inner hash - in other words, _encode_ it into the string used as the column-name (see examples below).
+
+h4. decoders
+
+When creating a configuration object for decoders, the third parameter is simply another function that reverses what the corresponding encoder did. Thus, it is a function that accepts a single parameter (the value that the encoder had produced) - and should return the value which had been encoded into it. 
+
+These two complementary functions allows the keys (to be more specific, the values) that are used as 'primary' to be encoded in and decoded out of the HBase table.
+
+h2. Example
+
+All this can be a bit confusing - but in practice, its really quite easy. I hope the following examples will show how -
+
+Let's assume we want to persist the following car objects:
+
+<pre><code>
+  :cars => [  
+    {:make => 'honda', :model => 'fit', :license => 'ah12001'},  
+    {:make => 'toyota', :model => 'yaris', :license => 'xb34544'}]
+</pre></code>
+These two cars need to be persisted into a single row of the cars table (in HBase). capjure will convert them into a form that looks like this:
+
+<pre><code>
+{  
+  "cars_model:ah12001" => "fit",  
+  "cars_make:ah12001" => "honda",  
+  "cars_model:xb34544" => "yaris",  
+  "cars_make:xb34544" => "toyota"  
+}   
+</pre></code>
+  
+This is done by using a configuration that looks like this -
+
+<pre><code>
+(def encoders (config-keys  
+  (config-for :cars :license  (fn [car-map]  
+                           (car-map :license))))  
+
+(def decoders (config-keys  
+  (config-for :cars :license  (fn [value]  
+                                value)))  
+
+(def keys-config {:encode encoders :decode decoders})  
+</pre></code>
+
+
+h2. API
+
+h3. the binding form
+
+As described earlier, capjure needs two vars bound whenever one of the API functions are used. That looks like -
+
+<pre><code>
+(binding [*hbase-master* "hbase.test-site.net:60000" *primary-keys-config* keys-config] 
+  ;capjure stuff goes here
+)
+</pre></code>
+
+h3. Functions of interest
+
+This is the most commonly used call - to push things into HBase -
+
+<pre><code>
+(binding [*hbase-master* "hbase.test-site.net:60000" *primary-keys-config* keys-config]  
+    (capjure-insert some-json-object "hbase_table_name" "some-row-id"))  
+</pre></code>
+
+and this is the reverse of that -
+
+<pre><code>
+(binding [*hbase-master* "hbase.test-site.net:60000" *primary-keys-config* keys-config]  
+    (read-as-hydrated "hbase_table_name" "some-row-id"))  
+</pre></code>
+
+h3. Other convenience functions 
+
+Here are some other useful functions
+
+<pre><code>
+row-exists? [hbase-table-name row-id-string]  
+cell-value-as-string [row column-name]  
+read-all-versions-as-strings [hbase-table-name row-id-string number-of-versions column-family-as-string]  
+read-cell [hbase-table-name row-id column-name]  
+rowcount [hbase-table-name & columns]  
+delete-all [hbase-table-name & row-ids-as-strings]  
+</pre></code>
+
+There are more, including some to get column-families information, and some to clone tables, etc.
+
+h2. capjure
+
+= capture + clojure. Ahahaha.
+ 
+Copyright 2009 Amit Rathore
