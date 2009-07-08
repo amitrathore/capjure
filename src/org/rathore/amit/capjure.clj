@@ -284,8 +284,25 @@
 	admin (HBaseAdmin. (hbase-config))]
     (.createTableAsync admin desc)))
 
+(defn add-hbase-columns [table-name column-family-names versions]
+  (let [admin (HBaseAdmin. (hbase-config))
+	col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
+				  (.setMaxVersions desc versions)
+				  desc))]
+    (.disableTable admin (.getBytes table-name))
+    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
+    (.enableTable admin (.getBytes table-name))))	
+
 (defn clone-table [new-hbase-table-name from-hbase-table-name]
   (apply create-hbase-table new-hbase-table-name (column-families-for from-hbase-table-name)))
+
+(defn disable-table [table-name]
+  (let [admin (HBaseAdmin. (hbase-config))]
+    (.disableTable admin (.getBytes table-name))))
+
+(defn enable-table [table-name]
+  (let [admin (HBaseAdmin. (hbase-config))]
+    (.enableTable admin (.getBytes table-name))))	
 
 (defn drop-hbase-table [hbase-table-name]
   (let [admin (HBaseAdmin. (hbase-config))]
