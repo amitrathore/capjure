@@ -221,8 +221,8 @@
      (let [table (hbase-table hbase-table-name)]
        (.getRow table row-id-string number-of-versions)))
   ([hbase-table-name row-id-string column-family-as-string number-of-versions]
-  (let [table (hbase-table hbase-table-name)]
-    (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
+     (let [table (hbase-table hbase-table-name)]
+       (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
 
 (defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
   (let [hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
@@ -273,6 +273,9 @@
 	table-descriptor (.getTableDescriptor table)]
     (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
 
+(defn column-names-as-strings [result-row]
+  (map #(String. %) (.keySet result-row)))
+
 (defn hbase-config []
   (let [h-config (HBaseConfiguration.) 	
 	_ (.set h-config "hbase.master", *hbase-master*)]
@@ -285,14 +288,15 @@
     (.createTableAsync admin desc)))
 
 (defn add-hbase-columns [table-name column-family-names versions]
-  (let [admin (HBaseAdmin. (hbase-config))
-	col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
-				  (.setMaxVersions desc versions)
-				  desc))]
-    (.disableTable admin (.getBytes table-name))
-    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
-    (.enableTable admin (.getBytes table-name))))	
-
+  (if-not (empty? column-family-names)
+	  (let [admin (HBaseAdmin. (hbase-config))
+		col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
+					  (.setMaxVersions desc versions)
+					  desc))]
+	    (.disableTable admin (.getBytes table-name))
+	    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
+	    (.enableTable admin (.getBytes table-name)))))	
+  
 (defn clone-table [new-hbase-table-name from-hbase-table-name]
   (apply create-hbase-table new-hbase-table-name (column-families-for from-hbase-table-name)))
 
