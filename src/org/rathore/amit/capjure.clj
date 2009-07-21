@@ -201,7 +201,9 @@
     (.exists table (.getBytes row-id-string))))	
 
 (defn cell-value-as-string [row column-name]
-  (String. (.getValue (.get row (.getBytes column-name)))))
+  (let [cell (.get row (.getBytes column-name))]
+    (if-not cell ""
+	    (String. (.getValue cell)))))
 
 (defn read-row [hbase-table-name row-id]
   (let [table (hbase-table hbase-table-name)]
