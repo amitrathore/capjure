@@ -3,7 +3,7 @@
 (import '(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter))
+	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter RegExpRowFilter))
 
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
@@ -216,6 +216,14 @@
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
   (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (InclusiveStopRowFilter. (.getBytes end-row-id)))]
+    (iterator-seq (.iterator scanner))))
+
+(defn first-row-id [hbase-table-name column-name]
+  (let [first-row-scanner (table-scanner hbase-table-name [column-name])]
+    (String. (.getRow (first (iterator-seq (.iterator first-row-scanner)))))))
+
+(defn read-rows-like [hbase-table-name columns start-row-id-string row-id-regex]
+  (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id-string) (RegExpRowFilter. row-id-regex))]
     (iterator-seq (.iterator scanner))))
 
 (defn read-all-versions 
