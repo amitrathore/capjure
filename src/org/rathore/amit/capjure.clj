@@ -182,6 +182,9 @@
 				keyset)]
     (apply merge columns-and-values)))  
 
+(defn hydrate-hbase-row [hbase-row]
+  (hydrate (hbase-object-as-hash hbase-row)))
+
 (defn to-strings [array-of-byte-arrays]
   (map #(String. %) array-of-byte-arrays))
 
