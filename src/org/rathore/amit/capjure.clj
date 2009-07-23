@@ -218,9 +218,12 @@
   (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (InclusiveStopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
+(defn row-id-of-row [hbase-row]
+  (String. (.getRow hbase-row)))
+
 (defn first-row-id [hbase-table-name column-name]
   (let [first-row-scanner (table-scanner hbase-table-name [column-name])]
-    (String. (.getRow (first (iterator-seq (.iterator first-row-scanner)))))))
+    (row-id-of-row (first (iterator-seq (.iterator first-row-scanner))))))
 
 (defn read-rows-like [hbase-table-name columns start-row-id-string row-id-regex]
   (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id-string) (RegExpRowFilter. row-id-regex))]
@@ -242,7 +245,7 @@
 
 (defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
   (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
-	row-ids (map #(String. (.getRow %)) rows-between)]
+	row-ids (map #(row-id-of-row %) rows-between)]
     (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
@@ -268,7 +271,7 @@
 (defn next-row-id [hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
 	_ (.next scanner)]
-    (String. (.getRow (.next scanner)))))
+    (row-id-of-row (.next scanner))))
 
 (defn rowcount [hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
