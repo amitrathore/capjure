@@ -1,9 +1,10 @@
 (ns org.rathore.amit.capjure)
 
+(use 'org.rathore.amit.utils)
 (import '(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter RegExpRowFilter))
+	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
@@ -22,10 +23,10 @@
 (defn encoding-functor-for [key-name]
   (((encoding-keys) (keyword key-name)) :functor))
 
-(defn all-primary-keys []
+(defmemoized all-primary-keys []
   (map #(symbol-name %) (keys (encoding-keys))))
 
-(defn primary-key [column-family]
+(defmemoized primary-key [column-family]
   (first (filter #(.startsWith column-family (str %)) (all-primary-keys))))
 
 (defn decoding-functor-for [key-name]
@@ -115,7 +116,7 @@
 		(seq bloated_object))))
 
 (declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
-(defn is-from-primary-keys [key-name]
+(defmemoized is-from-primary-keys [key-name]
   (let [key-name-str (symbol-name key-name)]
     (some #(.startsWith key-name-str %) (all-primary-keys))))
 
@@ -219,6 +220,11 @@
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
   (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (InclusiveStopRowFilter. (.getBytes end-row-id)))]
+    (iterator-seq (.iterator scanner))))
+
+(defn read-rows-up-to [hbase-table-name columns start-row-id end-row-id]
+  ;; NOTE: not inclusive of the end row
+  (let [scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
 (defn row-id-of-row [hbase-row]
@@ -333,5 +339,7 @@
     (.deleteTable hbase-table-name)))
 
 (defn hbase-table [hbase-table-name]
-  (let [h-config (hbase-config)]
-    (HTable. h-config hbase-table-name)))
+  (let [h-config (hbase-config)
+	table (HTable. h-config hbase-table-name)]
+    (.setScannerCaching table 1000)
+    table))
