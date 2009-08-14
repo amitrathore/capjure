@@ -278,10 +278,10 @@
   ([#^String hbase-table-name columns #^String start-row-string]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (into-array columns) start-row-string)))
-  ([#^String hbase-table-name columns #^String start-row-string #^RowFilterInterface row-filter]
+  ([#^String hbase-table-name columns #^bytes start-row-id-as-bytes #^RowFilterInterface row-filter]
      (let [table (hbase-table hbase-table-name)
 	   columns-to-scan (into-array (map #(.getBytes %) columns))]
-       (.getScanner table columns-to-scan start-row-string row-filter))))
+       (.getScanner table columns-to-scan start-row-id-as-bytes row-filter))))
 
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
