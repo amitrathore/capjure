@@ -12,6 +12,9 @@
 
 (declare symbol-name)
 
+(defmemoized symbolize [a-string]
+  (keyword a-string))
+
 (defn encoding-keys []
   (*primary-keys-config* :encode))
 
@@ -136,9 +139,11 @@
 		(assoc ret primary-key inner-values))))))
 
 (defn hydrate [flattened-object]
-  (let [flat-keys (to-array (keys flattened-object))]
-    (collapse-for-hydration (areduce flat-keys idx ret {}
-				     (hydrate-pair (aget flat-keys idx) flattened-object ret)))))
+  (let [flat-keys (to-array (keys flattened-object))
+	mostly-hydrated (areduce flat-keys idx ret {}
+				     (hydrate-pair (aget flat-keys idx) flattened-object ret))
+	pair-symbolizer (fn [[key value]] {(symbolize key) value})]
+    (apply merge (map pair-symbolizer (collapse-for-hydration mostly-hydrated)))))
 
 (defn hydrate-pair [#^String key-name flattened hydrated]
   (let [#^String value (.trim (str (flattened key-name)))
@@ -152,28 +157,28 @@
      :else (has-one-object-hydration hydrated column-family column-name value))))
 
 (defn has-one-string-hydration [hydrated #^String column-family #^String value]
-  (assoc hydrated column-family value))
+  (assoc hydrated (symbolize column-family) value))
 
 (defn has-one-object-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [value-map (or (hydrated column-family) {})]
     (assoc hydrated column-family
-	   (assoc value-map column-name value))))
+	   (assoc value-map (symbolize column-name) value))))
 
 (defn has-many-strings-hydration [hydrated #^String column-family #^String value]
   (let [old-value (hydrated column-family)]
     (if (nil? old-value) 
-      (assoc hydrated column-family [value])
-      (assoc hydrated column-family (apply vector (seq (cons value old-value)))))))
+      (assoc hydrated (symbolize column-family) [value])
+      (assoc hydrated (symbolize column-family) (apply vector (seq (cons value old-value)))))))
 
 (defn has-many-objects-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [#^String outer-key (primary-key column-family)
 	#^String inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
 	primary-key-name (qualifier-for outer-key)
 	inner-map (or (hydrated outer-key) {})
-	inner-object (or (inner-map column-name) {(symbol-name primary-key-name) (decode-with-key outer-key column-name)})]
+	inner-object (or (inner-map column-name) {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
     (assoc hydrated outer-key 
-	   (assoc inner-map column-name 
-		  (assoc inner-object inner-key value)))))
+	   (assoc inner-map column-name
+		  (assoc inner-object (symbolize inner-key) value)))))
 
 (defn columns-from-hbase-row-result [#^RowResult hbase-row]
   (let [#^Set<byte[]> key-set (.keySet hbase-row)]
@@ -278,10 +283,10 @@
   ([#^String hbase-table-name columns #^String start-row-string]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (into-array columns) start-row-string)))
-  ([#^String hbase-table-name columns #^bytes start-row-id-as-bytes #^RowFilterInterface row-filter]
+  ([#^String hbase-table-name columns #^String start-row-string #^RowFilterInterface row-filter]
      (let [table (hbase-table hbase-table-name)
 	   columns-to-scan (into-array (map #(.getBytes %) columns))]
-       (.getScanner table columns-to-scan start-row-id-as-bytes row-filter))))
+       (.getScanner table columns-to-scan start-row-string row-filter))))
 
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
@@ -304,7 +309,7 @@
 (defn column-names-as-strings [#^RowResult result-row]
   (map #(String. %) (.keySet result-row)))
 
-(defn hbase-config []
+(defmemoized hbase-config []
   (let [h-config (HBaseConfiguration.) 	
 	_ (.set h-config "hbase.master", *hbase-master*)]
     h-config))
