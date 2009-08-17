@@ -2,7 +2,7 @@
 
 # Please make sure to configure ~/.clojure.conf or /etc/clojure.conf
 #  sample configuration can be found at clojure.conf.sample
-#
+# 
 # Note, running this script will:
 #   - Run ~/.clojurerc on boot up (if exists)
 #   - Add all .jar files within clj_ext (~/.clojure on default)
