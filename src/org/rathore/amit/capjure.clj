@@ -10,6 +10,8 @@
 (def *hbase-master* "localhost:60000")
 (def *primary-keys-config* {})
 
+(def COLUMN-NAME-DELIMITER ":")
+
 (declare symbol-name)
 
 (defmemoized symbolize [a-string]
@@ -83,9 +85,9 @@
 (declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
   (cond
-   (map? value) (prepend-to-keys key ":" value)
+   (map? value) (prepend-to-keys key COLUMN-NAME-DELIMITER value)
    (vector? value) (process-multiple key value)
-   :else {(new-key key ":" "") value}))
+   :else {(new-key key COLUMN-NAME-DELIMITER "") value}))
 
 (defn process-multiple [key values]
   (let [all (seq values)]
@@ -106,12 +108,12 @@
   (let [all-keys (to-array (keys single-map))]
     (areduce all-keys idx ret {}
 	     (assoc ret
-		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) ":" final-prefix)
+		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) COLUMN-NAME-DELIMITER final-prefix)
 		   (single-map (aget all-keys idx))))))
 
 (defn process-strings [key strings] 
   (areduce strings idx ret {}
-	   (assoc ret (new-key key ":" (aget strings idx)) (aget strings idx))))
+	   (assoc ret (new-key key COLUMN-NAME-DELIMITER (aget strings idx)) (aget strings idx))))
 
 (defn flatten [bloated_object]
   (apply merge (map 
@@ -126,7 +128,7 @@
     (some #(.startsWith key-name-str %) (all-primary-keys))))
 
 (defmemoized column-name-empty? [key-name]
-  (= 1 (count (.split key-name ":"))))
+  (= 1 (count (.split key-name COLUMN-NAME-DELIMITER))))
 
 (defn collapse-for-hydration [mostly-hydrated]
   (let [primary-keys (to-array (all-primary-keys))]
@@ -147,7 +149,7 @@
 
 (defn hydrate-pair [#^String key-name flattened hydrated]
   (let [#^String value (.trim (str (flattened key-name)))
-	key-tokens (seq (.split key-name ":"))
+	key-tokens (seq (.split key-name COLUMN-NAME-DELIMITER))
 	#^String column-family (first key-tokens)
 	#^String column-name (last key-tokens)]
     (cond
@@ -198,7 +200,7 @@
   (map #(String. %) array-of-byte-arrays))
 
 (defn column-name-from [column-family-colon-column-name]
-  (last (to-strings (.split (String. column-family-colon-column-name) ":"))))
+  (last (to-strings (.split (String. column-family-colon-column-name) COLUMN-NAME-DELIMITER))))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [#^RowResult row (read-row hbase-table-name row-id)]
