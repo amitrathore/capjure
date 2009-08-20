@@ -7,7 +7,7 @@
 	'(org.apache.hadoop.hbase.io RowResult BatchUpdate Cell)
 	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
-(def *hbase-master* "localhost:60000")
+(def *hbase-master*)
 (def *primary-keys-config* {})
 
 (def COLUMN-NAME-DELIMITER ":")
