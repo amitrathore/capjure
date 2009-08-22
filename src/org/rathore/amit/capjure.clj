@@ -8,9 +8,15 @@
 	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
 (def *hbase-master*)
-(def *primary-keys-config* {})
+(def *single-column-family?*) 
+(def *hbase-single-column-family*)
+(def *primary-keys-config*)
 
-(def COLUMN-NAME-DELIMITER ":")
+(defn COLUMN-NAME-DELIMITER []
+  (if *single-column-family?* "__" ":"))
+
+(defn single-column-prefix []
+  (str *hbase-single-column-family* ":"))
 
 (declare symbol-name)
 
@@ -85,9 +91,9 @@
 (declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
   (cond
-   (map? value) (prepend-to-keys key COLUMN-NAME-DELIMITER value)
+   (map? value) (prepend-to-keys key (COLUMN-NAME-DELIMITER) value)
    (vector? value) (process-multiple key value)
-   :else {(new-key key COLUMN-NAME-DELIMITER "") value}))
+   :else {(new-key key (COLUMN-NAME-DELIMITER) "") value}))
 
 (defn process-multiple [key values]
   (let [all (seq values)]
@@ -108,19 +114,28 @@
   (let [all-keys (to-array (keys single-map))]
     (areduce all-keys idx ret {}
 	     (assoc ret
-		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) COLUMN-NAME-DELIMITER final-prefix)
+		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) (COLUMN-NAME-DELIMITER) final-prefix)
 		   (single-map (aget all-keys idx))))))
 
 (defn process-strings [key strings] 
   (areduce strings idx ret {}
-	   (assoc ret (new-key key COLUMN-NAME-DELIMITER (aget strings idx)) (aget strings idx))))
+	   (assoc ret (new-key key (COLUMN-NAME-DELIMITER) (aget strings idx)) (aget strings idx))))
 
+(defn prepend-keys-for-single-column-family [flattened]
+  (if-not *single-column-family?*
+    flattened
+    (let [prefix (single-column-prefix)
+	  key-prepender (fn [[key value]] 
+			  {(str prefix key) value})]
+      (apply merge (map key-prepender flattened)))))
+  
 (defn flatten [bloated_object]
-  (apply merge (map 
-		(fn [pair] 
-		  (process-key-value (first pair) (last pair)))
-		(seq bloated_object))))
-
+  (let [f (apply merge (map 
+			(fn [pair] 
+			  (process-key-value (first pair) (last pair)))
+			(seq bloated_object)))]
+    (prepend-keys-for-single-column-family f)))
+    
 (declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
 
 (defmemoized is-from-primary-keys [key-name]
@@ -128,7 +143,15 @@
     (some #(.startsWith key-name-str %) (all-primary-keys))))
 
 (defmemoized column-name-empty? [key-name]
-  (= 1 (count (.split key-name COLUMN-NAME-DELIMITER))))
+  (= 1 (count (.split key-name (COLUMN-NAME-DELIMITER)))))
+
+(defn strip-prefixes [flattened-and-prepended]
+  (if-not *single-column-family?*
+    flattened-and-prepended
+    (let [prefix-length (count (single-column-prefix))
+	  prefix-stripper (fn [[key value]]
+			       {(.substring key prefix-length) value})]
+      (apply merge (map prefix-stripper flattened-and-prepended)))))
 
 (defn collapse-for-hydration [mostly-hydrated]
   (let [primary-keys (to-array (all-primary-keys))]
@@ -140,8 +163,9 @@
 		 ret
 		(assoc ret primary-key inner-values))))))
 
-(defn hydrate [flattened-object]
-  (let [flat-keys (to-array (keys flattened-object))
+(defn hydrate [flattened-and-prepended]
+  (let [flattened-object (strip-prefixes flattened-and-prepended)
+	flat-keys (to-array (keys flattened-object))
 	mostly-hydrated (areduce flat-keys idx ret {}
 				     (hydrate-pair (aget flat-keys idx) flattened-object ret))
 	pair-symbolizer (fn [[key value]] {(symbolize key) value})]
@@ -149,7 +173,7 @@
 
 (defn hydrate-pair [#^String key-name flattened hydrated]
   (let [#^String value (.trim (str (flattened key-name)))
-	key-tokens (seq (.split key-name COLUMN-NAME-DELIMITER))
+	key-tokens (seq (.split key-name (COLUMN-NAME-DELIMITER)))
 	#^String column-family (first key-tokens)
 	#^String column-name (last key-tokens)]
     (cond
@@ -200,7 +224,7 @@
   (map #(String. %) array-of-byte-arrays))
 
 (defn column-name-from [column-family-colon-column-name]
-  (last (to-strings (.split (String. column-family-colon-column-name) COLUMN-NAME-DELIMITER))))
+  (last (to-strings (.split (String. column-family-colon-column-name) (COLUMN-NAME-DELIMITER)))))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [#^RowResult row (read-row hbase-table-name row-id)]
