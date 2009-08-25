@@ -50,11 +50,11 @@
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 
 (defn capjure-insert [object-to-save hbase-table-name row-id]
-  (let [#^HTable table (hbase-table hbase-table-name)
-	batch-update (BatchUpdate. (str row-id))
-	flattened (flatten object-to-save)]
-    (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)))
+  (with-hbase-table [table hbase-table-name]
+    (let [batch-update (BatchUpdate. (str row-id))
+	  flattened (flatten object-to-save)]
+      (add-to-insert-batch batch-update flattened)
+      (.commit table batch-update))))
 
 (defn add-to-insert-batch [#^BatchUpdate batch-update flattened-list]
   (loop [flattened-pairs flattened-list]
@@ -234,7 +234,7 @@
     (hydrate as-hash)))	
 
 (defn row-exists? [hbase-table-name row-id-string]
-  (let [#^HTable table (hbase-table hbase-table-name)]
+  (with-hbase-table [table hbase-table-name]
     (.exists table (.getBytes row-id-string))))	
 
 (defn cell-value-as-string [#^RowResult row #^String column-name]
@@ -243,11 +243,11 @@
 	    (String. (.getValue cell)))))
 
 (defn read-row [hbase-table-name row-id]
-  (let [#^HTable table (hbase-table hbase-table-name)]
+  (with-hbase-table [table hbase-table-name]
     (.getRow table (.getBytes row-id))))
 
 (defn read-rows [hbase-table-name row-id-list]
-  (let [#^HTable table (hbase-table hbase-table-name)]
+  (with-hbase-table [table hbase-table-name]
     (map #(.getRow table %) row-id-list)))
 
 (declare table-scanner)
@@ -273,10 +273,10 @@
 
 (defn read-all-versions 
   ([hbase-table-name row-id-string number-of-versions]
-     (let [#^HTable table (hbase-table hbase-table-name)]
+     (with-hbase-table [table hbase-table-name]
        (.getRow table row-id-string number-of-versions)))
   ([hbase-table-name row-id-string column-family-as-string number-of-versions]
-     (let [#^HTable table (hbase-table hbase-table-name)]
+     (with-hbase-table [table hbase-table-name]
        (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
 
 (defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
@@ -298,20 +298,20 @@
     (String. (.getValue (.get row (.getBytes column-name))))))
 
 (defn table-iterator [hbase-table-name columns]
-  (let [#^HTable table (hbase-table hbase-table-name)]
+  (with-hbase-table [table hbase-table-name]
     (iterator-seq (.iterator (.getScanner table (into-array columns))))))
 
 (defn table-scanner
   ([#^String hbase-table-name columns]
-     (let [table (hbase-table hbase-table-name)]
+     (with-hbase-table [table hbase-table-name]
        (.getScanner table (into-array columns))))
   ([#^String hbase-table-name columns #^String start-row-string]
-     (let [table (hbase-table hbase-table-name)]
+     (with-hbase-table [table hbase-table-name]
        (.getScanner table (into-array columns) start-row-string)))
   ([#^String hbase-table-name columns #^String start-row-string #^RowFilterInterface row-filter]
-     (let [table (hbase-table hbase-table-name)
-	   columns-to-scan (into-array (map #(.getBytes %) columns))]
-       (.getScanner table columns-to-scan start-row-string row-filter))))
+     (with-hbase-table [table hbase-table-name]
+       (let [columns-to-scan (into-array (map #(.getBytes %) columns))]
+	 (.getScanner table columns-to-scan start-row-string row-filter)))))
 
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
@@ -322,14 +322,14 @@
   (count (table-iterator hbase-table-name columns)))
 
 (defn delete-all [#^String hbase-table-name & row-ids-as-strings]
-  (let [table (hbase-table hbase-table-name)]
+  (with-hbase-table [table hbase-table-name]
     (doseq [row-id row-ids-as-strings]
       (.deleteAll table row-id))))
 
 (defmemoized column-families-for [hbase-table-name]
-  (let [table (hbase-table hbase-table-name)
-	table-descriptor (.getTableDescriptor table)]
-    (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
+  (with-hbase-table [table hbase-table-name]
+    (let [table-descriptor (.getTableDescriptor table)]
+      (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor)))))
 
 (defn column-names-as-strings [#^RowResult result-row]
   (map #(String. %) (.keySet result-row)))
@@ -381,7 +381,7 @@
     table))
 
 (defmacro with-hbase-table [[table hbase-table-name] & exprs]
-  `(let [~table (hbase-table ~hbase-table-name)]
+  `(let [#^HTable ~table (hbase-table ~hbase-table-name)]
      (do ~@exprs
 	 (.close ~table))))
 
