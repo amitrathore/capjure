@@ -66,10 +66,9 @@
 	(recur (rest flattened-pairs))))))
 
 (defmemoized symbol-name [prefix]
-  (if
-   (keyword? prefix) 
-     (name prefix)
-     (str prefix)))
+  (if (keyword? prefix) 
+    (name prefix)
+    (str prefix)))
 
 (defn new-key [part1 separator part2]
   (str (symbol-name part1) separator (symbol-name part2)))
@@ -380,3 +379,12 @@
 	table (HTable. h-config hbase-table-name)]
     (.setScannerCaching table 1000)
     table))
+
+(defmacro with-hbase-table [[table hbase-table-name] & exprs]
+  `(let [~table (hbase-table ~hbase-table-name)]
+     (do ~@exprs
+	 (.close ~table))))
+
+(defmacro with-scanner [[scanner] & exprs]
+  `(do ~@exprs
+       (.close ~scanner)))
