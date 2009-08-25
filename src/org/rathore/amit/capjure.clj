@@ -20,6 +20,14 @@
 
 (declare symbol-name)
 
+(defmacro with-hbase-table [[table hbase-table-name] & exprs]
+  `(with-open [#^HTable ~table (hbase-table ~hbase-table-name)]
+     (do ~@exprs)))
+
+(defmacro with-scanner [[scanner] & exprs]
+  `(do ~@exprs
+     (.close ~scanner)))
+
 (defmemoized symbolize [a-string]
   (keyword a-string))
 
@@ -379,12 +387,3 @@
 	table (HTable. h-config hbase-table-name)]
     (.setScannerCaching table 1000)
     table))
-
-(defmacro with-hbase-table [[table hbase-table-name] & exprs]
-  `(let [#^HTable ~table (hbase-table ~hbase-table-name)]
-     (do ~@exprs
-	 (.close ~table))))
-
-(defmacro with-scanner [[scanner] & exprs]
-  `(do ~@exprs
-       (.close ~scanner)))
