@@ -3,9 +3,9 @@
 (use 'org.rathore.amit.utils)
 (import '(java.util Set)
 	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	'(org.apache.hadoop.hbase.client HTable Scanner HBaseAdmin)
+	'(org.apache.hadoop.hbase.client Scan HTable Scanner HBaseAdmin)
 	'(org.apache.hadoop.hbase.io RowResult BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
+	'(org.apache.hadoop.hbase.filter Filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
 (def *hbase-master*)
 (def *single-column-family?*) 
@@ -205,18 +205,18 @@
 	   (assoc inner-map column-name
 		  (assoc inner-object (symbolize inner-key) value)))))
 
-(defn columns-from-hbase-row-result [#^RowResult hbase-row]
+(defn columns-from-hbase-row-result [ hbase-row]
   (let [#^Set<byte[]> key-set (.keySet hbase-row)]
     (map (fn [#^bytes k] (String. k)) (seq key-set))))
 
-(defn hbase-object-as-hash [#^RowResult hbase-row]
+(defn hbase-object-as-hash [ hbase-row]
   (let [keyset (columns-from-hbase-row-result hbase-row)
 	columns-and-values (map (fn [column-name]
 				  {column-name (cell-value-as-string hbase-row column-name)})
 				keyset)]
     (apply merge columns-and-values)))  
 
-(defn hydrate-hbase-row [#^RowResult hbase-row]
+(defn hydrate-hbase-row [ hbase-row]
   (hydrate (hbase-object-as-hash hbase-row)))
 
 (defn to-strings [array-of-byte-arrays]
@@ -226,7 +226,7 @@
   (last (to-strings (.split (String. column-family-colon-column-name) (COLUMN-NAME-DELIMITER)))))
 
 (defn read-as-hash [hbase-table-name row-id]
-  (let [#^RowResult row (read-row hbase-table-name row-id)]
+  (let [ row (read-row hbase-table-name row-id)]
     (hbase-object-as-hash row)))
 
 (defn read-as-hydrated [hbase-table-name row-id]
@@ -237,7 +237,7 @@
   (let [#^HTable table (hbase-table hbase-table-name)]
     (.exists table (.getBytes row-id-string))))	
 
-(defn cell-value-as-string [#^RowResult row #^String column-name]
+(defn cell-value-as-string [ row #^String column-name]
   (let [#^Cell cell (.get row (.getBytes column-name))]
     (if-not cell ""
 	    (String. (.getValue cell)))))
@@ -252,7 +252,7 @@
 
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
-  (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (InclusiveStopRowFilter. (.getBytes end-row-id)))]
+  (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (.getBytes end-row-id))]
     (iterator-seq (.iterator scanner))))
 
 (defn read-rows-up-to [hbase-table-name columns start-row-id end-row-id]
@@ -260,7 +260,7 @@
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
-(defn row-id-of-row [#^RowResult hbase-row]
+(defn row-id-of-row [ hbase-row]
   (String. (.getRow hbase-row)))
 
 (defn first-row-id [hbase-table-name column-name]
@@ -280,7 +280,7 @@
        (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
 
 (defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
-  (let [#^RowResult hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
+  (let [ hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
 	available-columns (keys (.entrySet hbase-row))
 	cell-versions-collector (fn [col-name] { 
 				   (column-name-from col-name) 
@@ -290,16 +290,30 @@
 
 (defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
   (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
-	row-ids (map (fn [#^RowResult rr] (row-id-of-row rr)) rows-between)]
+	row-ids (map (fn [ rr] (row-id-of-row rr)) rows-between)]
     (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
-  (let [#^RowResult row (read-row hbase-table-name row-id)]
+  (let [ row (read-row hbase-table-name row-id)]
     (String. (.getValue (.get row (.getBytes column-name))))))
 
 (defn table-iterator [hbase-table-name columns]
   (let [#^HTable table (hbase-table hbase-table-name)]
     (iterator-seq (.iterator (.getScanner table (into-array columns))))))
+
+(defn add-columns-to-scan [#^Scan scan columns]
+  (doseq [#^String col columns]
+    (.addColumn scan (.getBytes col))))
+
+(defn scan-for-start-and-end [columns #^bytes start-row-bytes #^bytes end-row-bytes]
+  (let [scan (Scan. start-row-bytes end-row-bytes)]
+    (add-columns-to-scan scan columns)
+    scan))
+
+(defn scan-for-start-and-filter [columns #^bytes start-row-bytes #^Filter filter]
+  (let [scan (Scan. start-row-bytes filter)]
+    (add-columns-to-scan scan columns)
+    scan))
 
 (defn table-scanner
   ([#^String hbase-table-name columns]
@@ -308,10 +322,9 @@
   ([#^String hbase-table-name columns #^String start-row-string]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (into-array columns) start-row-string)))
-  ([#^String hbase-table-name columns #^String start-row-string #^RowFilterInterface row-filter]
-     (let [table (hbase-table hbase-table-name)
-	   columns-to-scan (into-array (map #(.getBytes %) columns))]
-       (.getScanner table columns-to-scan start-row-string row-filter))))
+  ([#^String hbase-table-name columns #^bytes start-row-bytes end-row-bytes]
+     (let [table (hbase-table hbase-table-name)]
+       (.getScanner table (scan-for-start-and-end columns start-row-bytes end-row-bytes)))))
 
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
@@ -331,7 +344,7 @@
 	table-descriptor (.getTableDescriptor table)]
     (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
 
-(defn column-names-as-strings [#^RowResult result-row]
+(defn column-names-as-strings [ result-row]
   (map #(String. %) (.keySet result-row)))
 
 (defmemoized hbase-config []
