@@ -51,8 +51,8 @@
 
 (defn capjure-insert [object-to-save hbase-table-name row-id]
   (let [#^HTable table (hbase-table hbase-table-name)
-	batch-update (BatchUpdate. (str row-id))
-	flattened (flatten object-to-save)]
+        batch-update (BatchUpdate. (str row-id))
+        flattened (flatten object-to-save)]
     (add-to-insert-batch batch-update flattened)
     (.commit table batch-update)))
 
@@ -60,10 +60,10 @@
   (loop [flattened-pairs flattened-list]
     (if (not (empty? flattened-pairs))
       (let [first-pair (first flattened-pairs)
-	    column (first first-pair)
-	    value (last first-pair)]
-	(.put batch-update column (.getBytes (str value)))
-	(recur (rest flattened-pairs))))))
+            column (first first-pair)
+            value (last first-pair)]
+        (.put batch-update column (.getBytes (str value)))
+        (recur (rest flattened-pairs))))))
 
 (defmemoized symbol-name [prefix]
   (if (keyword? prefix) 
@@ -90,16 +90,15 @@
 (declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
   (cond
-   (map? value) (prepend-to-keys key (COLUMN-NAME-DELIMITER) value)
-   (vector? value) (process-multiple key value)
-   :else {(new-key key (COLUMN-NAME-DELIMITER) "") value}))
+    (map? value) (prepend-to-keys key (COLUMN-NAME-DELIMITER) value)
+    (vector? value) (process-multiple key value)
+    :else {(new-key key (COLUMN-NAME-DELIMITER) "") value}))
 
 (defn process-multiple [key values]
   (let [all (seq values)]
-    (if
-     (map? (first all)) 
-     (process-maps key all)
-     (process-strings key (to-array all)))))
+    (if (map? (first all)) 
+      (process-maps key all)
+      (process-strings key (to-array all)))))
 
 (defn process-maps [key maps]
   (let [qualifier (qualifier-for key)
@@ -112,20 +111,20 @@
 (defn process-map [initial-prefix final-prefix single-map]
   (let [all-keys (to-array (keys single-map))]
     (areduce all-keys idx ret {}
-	     (assoc ret
-		   (str initial-prefix "_" (symbol-name (aget all-keys idx)) (COLUMN-NAME-DELIMITER) final-prefix)
-		   (single-map (aget all-keys idx))))))
+      (assoc ret
+        (str initial-prefix "_" (symbol-name (aget all-keys idx)) (COLUMN-NAME-DELIMITER) final-prefix)
+        (single-map (aget all-keys idx))))))
 
 (defn process-strings [key strings] 
   (areduce strings idx ret {}
-	   (assoc ret (new-key key (COLUMN-NAME-DELIMITER) (aget strings idx)) (aget strings idx))))
+	  (assoc ret (new-key key (COLUMN-NAME-DELIMITER) (aget strings idx)) (aget strings idx))))
 
 (defn prepend-keys-for-single-column-family [flattened]
   (if-not *single-column-family?*
     flattened
     (let [prefix (single-column-prefix)
-	  key-prepender (fn [[key value]] 
-			  {(str prefix key) value})]
+          key-prepender (fn [[key value]] 
+                          {(str prefix key) value})]
       (apply merge (map key-prepender flattened)))))
   
 (defn flatten [bloated_object]
@@ -148,38 +147,38 @@
   (if-not *single-column-family?*
     flattened-and-prepended
     (let [prefix-length (count (single-column-prefix))
-	  prefix-stripper (fn [[key value]]
-			       {(.substring key prefix-length) value})]
+          prefix-stripper (fn [[key value]]
+                            {(.substring key prefix-length) value})]
       (apply merge (map prefix-stripper flattened-and-prepended)))))
 
 (defn collapse-for-hydration [mostly-hydrated]
   (let [primary-keys (to-array (all-primary-keys))]
     (areduce primary-keys idx ret mostly-hydrated
 	     (let [primary-key (symbol-name (aget primary-keys idx))
-		   inner-map (ret primary-key)
-		   inner-values (apply vector (vals inner-map))]
+             inner-map (ret primary-key)
+             inner-values (apply vector (vals inner-map))]
 	       (if (empty? inner-values) 
-		 ret
-		(assoc ret primary-key inner-values))))))
+           ret
+           (assoc ret primary-key inner-values))))))
 
 (defn hydrate [flattened-and-prepended]
   (let [flattened-object (strip-prefixes flattened-and-prepended)
-	flat-keys (to-array (keys flattened-object))
-	mostly-hydrated (areduce flat-keys idx ret {}
-				     (hydrate-pair (aget flat-keys idx) flattened-object ret))
-	pair-symbolizer (fn [[key value]] {(symbolize key) value})]
+        flat-keys (to-array (keys flattened-object))
+        mostly-hydrated (areduce flat-keys idx ret {}
+                          (hydrate-pair (aget flat-keys idx) flattened-object ret))
+        pair-symbolizer (fn [[key value]] {(symbolize key) value})]
     (apply merge (map pair-symbolizer (collapse-for-hydration mostly-hydrated)))))
 
 (defn hydrate-pair [#^String key-name flattened hydrated]
   (let [#^String value (.trim (str (flattened key-name)))
-	key-tokens (seq (.split key-name (COLUMN-NAME-DELIMITER)))
-	#^String column-family (first key-tokens)
-	#^String column-name (last key-tokens)]
+        key-tokens (seq (.split key-name (COLUMN-NAME-DELIMITER)))
+        #^String column-family (first key-tokens)
+        #^String column-name (last key-tokens)]
     (cond
-     (= column-name value) (has-many-strings-hydration hydrated column-family value)
-     (is-from-primary-keys column-family) (has-many-objects-hydration hydrated column-family column-name value)
-     (column-name-empty? key-name) (has-one-string-hydration hydrated column-family value)
-     :else (has-one-object-hydration hydrated column-family column-name value))))
+      (= column-name value) (has-many-strings-hydration hydrated column-family value)
+      (is-from-primary-keys column-family) (has-many-objects-hydration hydrated column-family column-name value)
+      (column-name-empty? key-name) (has-one-string-hydration hydrated column-family value)
+      :else (has-one-object-hydration hydrated column-family column-name value))))
 
 (defn has-one-string-hydration [hydrated #^String column-family #^String value]
   (assoc hydrated (symbolize column-family) value))
@@ -197,13 +196,13 @@
 
 (defn has-many-objects-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [#^String outer-key (primary-key column-family)
-	#^String inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
-	primary-key-name (qualifier-for outer-key)
-	inner-map (or (hydrated outer-key) {})
-	inner-object (or (inner-map column-name) {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
+        #^String inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
+        primary-key-name (qualifier-for outer-key)
+        inner-map (or (hydrated outer-key) {})
+        inner-object (or (inner-map column-name) {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
     (assoc hydrated outer-key 
-	   (assoc inner-map column-name
-		  (assoc inner-object (symbolize inner-key) value)))))
+	    (assoc inner-map column-name
+		    (assoc inner-object (symbolize inner-key) value)))))
 
 (defn columns-from-hbase-row-result [hbase-row-result]
   (let [#^Set<byte[]> key-set (.keySet hbase-row-result)]
@@ -282,16 +281,16 @@
 
 (defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
   (let [ hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
-	available-columns (keys (.entrySet hbase-row))
-	cell-versions-collector (fn [col-name] { 
-				   (column-name-from col-name) 
-				   (map #(String. (.getValue %)) (iterator-seq (.iterator (.get hbase-row col-name)))) 
-				  })]
+        available-columns (keys (.entrySet hbase-row))
+        cell-versions-collector (fn [col-name] { 
+                                                (column-name-from col-name) 
+                                                (map #(String. (.getValue %)) (iterator-seq (.iterator (.get hbase-row col-name)))) 
+                                                })]
     (apply merge (map cell-versions-collector available-columns))))
 
 (defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
   (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
-	row-ids (map (fn [ rr] (row-id-of-row rr)) rows-between)]
+        row-ids (map (fn [ rr] (row-id-of-row rr)) rows-between)]
     (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
@@ -346,7 +345,7 @@
 
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
-	_ (.next scanner)]
+        _ (.next scanner)]
     (row-id-of-row (.next scanner))))
 
 (defn rowcount [#^String hbase-table-name & columns]
@@ -359,7 +358,7 @@
 
 (defmemoized column-families-for [hbase-table-name]
   (let [table (hbase-table hbase-table-name)
-	table-descriptor (.getTableDescriptor table)]
+        table-descriptor (.getTableDescriptor table)]
     (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
 
 (defn column-names-as-strings [ result-row]
@@ -367,29 +366,29 @@
 
 (defmemoized hbase-config []
   (let [h-config (HBaseConfiguration.) 	
-	_ (.set h-config "hbase.master", *hbase-master*)]
+        _ (.set h-config "hbase.master", *hbase-master*)]
     h-config))
 
 (defn create-hbase-table [#^String table-name max-versions & column-families]
   (let [desc (HTableDescriptor. table-name)
-	col-desc (fn [col-family-name]
-		   (let [hcdesc (HColumnDescriptor. col-family-name)]
-		     (.setMaxVersions hcdesc max-versions)
-		     (.addFamily desc hcdesc)))
-	_ (doall (map col-desc column-families))
-	admin (HBaseAdmin. (hbase-config))]
+        col-desc (fn [col-family-name]
+                   (let [hcdesc (HColumnDescriptor. col-family-name)]
+                     (.setMaxVersions hcdesc max-versions)
+                     (.addFamily desc hcdesc)))
+        _ (doall (map col-desc column-families))
+        admin (HBaseAdmin. (hbase-config))]
     (.createTableAsync admin desc)))
 
 (defn add-hbase-columns [table-name column-family-names versions]
   (if-not (empty? column-family-names)
 	  (let [admin (HBaseAdmin. (hbase-config))
-		col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
-					  (.setMaxVersions desc versions)
-					  desc))]
+          col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
+                                    (.setMaxVersions desc versions)
+                                    desc))]
 	    (.disableTable admin (.getBytes table-name))
 	    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
 	    (.enableTable admin (.getBytes table-name)))))	
-  
+
 (defn clone-table [#^String new-hbase-table-name #^String from-hbase-table-name max-versions]
   (apply create-hbase-table new-hbase-table-name max-versions (column-families-for from-hbase-table-name)))
 
@@ -407,15 +406,15 @@
 
 (defn hbase-table [#^String hbase-table-name]
   (let [h-config (hbase-config)
-	table (HTable. h-config hbase-table-name)]
+        table (HTable. h-config hbase-table-name)]
     (.setScannerCaching table 1000)
     table))
 
 (defmacro with-hbase-table [[table hbase-table-name] & exprs]
   `(let [~table (hbase-table ~hbase-table-name)]
      (do ~@exprs
-	 (.close ~table))))
+       (.close ~table))))
 
 (defmacro with-scanner [[scanner] & exprs]
   `(do ~@exprs
-       (.close ~scanner)))
+     (.close ~scanner)))
