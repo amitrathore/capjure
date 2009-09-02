@@ -205,18 +205,19 @@
 	   (assoc inner-map column-name
 		  (assoc inner-object (symbolize inner-key) value)))))
 
-(defn columns-from-hbase-row-result [ hbase-row]
-  (let [#^Set<byte[]> key-set (.keySet hbase-row)]
+(defn columns-from-hbase-row-result [hbase-row-result]
+  (let [#^Set<byte[]> key-set (.keySet hbase-row-result)]
     (map (fn [#^bytes k] (String. k)) (seq key-set))))
 
-(defn hbase-object-as-hash [ hbase-row]
-  (let [keyset (columns-from-hbase-row-result hbase-row)
-	columns-and-values (map (fn [column-name]
-				  {column-name (cell-value-as-string hbase-row column-name)})
-				keyset)]
-    (apply merge columns-and-values)))  
+(defn hbase-object-as-hash [hbase-result]
+  (let [hbase-row-result (.getRowResult hbase-result)
+        keyset (columns-from-hbase-row-result hbase-row-result)
+        columns-and-values (map (fn [column-name]
+                                  {column-name (cell-value-as-string hbase-row-result column-name)})
+                             keyset)]
+    (apply merge columns-and-values)))
 
-(defn hydrate-hbase-row [ hbase-row]
+(defn hydrate-hbase-row [hbase-row]
   (hydrate (hbase-object-as-hash hbase-row)))
 
 (defn to-strings [array-of-byte-arrays]
@@ -237,7 +238,7 @@
   (let [#^HTable table (hbase-table hbase-table-name)]
     (.exists table (.getBytes row-id-string))))	
 
-(defn cell-value-as-string [ row #^String column-name]
+(defn cell-value-as-string [row #^String column-name]
   (let [#^Cell cell (.get row (.getBytes column-name))]
     (if-not cell ""
 	    (String. (.getValue cell)))))
@@ -305,6 +306,16 @@
   (doseq [#^String col columns]
     (.addColumn scan (.getBytes col))))
 
+(defn scan-for-all [columns]
+  (let [scan (Scan.)]
+    (add-columns-to-scan scan columns)
+    scan))
+
+(defn scan-for-start [columns #^bytes start-row-bytes]
+  (let [scan (Scan. start-row-bytes)]
+    (add-columns-to-scan scan columns)
+    scan))
+
 (defn scan-for-start-and-end [columns #^bytes start-row-bytes #^bytes end-row-bytes]
   (let [scan (Scan. start-row-bytes end-row-bytes)]
     (add-columns-to-scan scan columns)
@@ -318,10 +329,10 @@
 (defn table-scanner
   ([#^String hbase-table-name columns]
      (let [table (hbase-table hbase-table-name)]
-       (.getScanner table (into-array columns))))
+       (.getScanner table (scan-for-all columns))))
   ([#^String hbase-table-name columns #^String start-row-string]
      (let [table (hbase-table hbase-table-name)]
-       (.getScanner table (into-array columns) start-row-string)))
+       (.getScanner table (scan-for-start columns (.getBytes start-row-string)))))
   ([#^String hbase-table-name columns #^bytes start-row-bytes end-row-bytes]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-start-and-end columns start-row-bytes end-row-bytes)))))
