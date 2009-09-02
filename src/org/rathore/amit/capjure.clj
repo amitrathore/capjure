@@ -337,6 +337,13 @@
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-start-and-end columns start-row-bytes end-row-bytes)))))
 
+(defn hbase-row-seq [scanner]
+  (let [first-row (.next scanner)]
+    (if-not first-row
+      nil
+      (lazy-seq 
+        (cons first-row (hbase-row-seq scanner))))))
+
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
 	_ (.next scanner)]
