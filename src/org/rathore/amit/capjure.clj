@@ -3,7 +3,7 @@
 (use 'org.rathore.amit.utils)
 (import '(java.util Set)
 	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	'(org.apache.hadoop.hbase.client Scan HTable Scanner HBaseAdmin)
+	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
 	'(org.apache.hadoop.hbase.io RowResult BatchUpdate Cell)
 	'(org.apache.hadoop.hbase.filter Filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
@@ -242,13 +242,26 @@
     (if-not cell ""
 	    (String. (.getValue cell)))))
 
+(defn get-result-for [hbase-table-name #^String row-id]
+  (let [#^HTable table (hbase-table hbase-table-name)
+        hbase-get-row-id (Get. (.getBytes row-id))]
+    (.get table hbase-get-row-id)))
+
+(defn read-result [hbase-table-name row-id]
+  (get-result-for hbase-table-name row-id))
+  ;; (let [#^HTable table (hbase-table hbase-table-name)]
+  ;;   (.getRow table (.getBytes row-id))))
+
 (defn read-row [hbase-table-name row-id]
-  (let [#^HTable table (hbase-table hbase-table-name)]
-    (.getRow table (.getBytes row-id))))
+  (.getRowResult (read-result hbase-table-name row-id)))
+
+(defn read-results [hbase-table-name row-id-list]
+  (map #(get-result-for hbase-table-name %) row-id-list))
+  ;; (let [#^HTable table (hbase-table hbase-table-name)]
+  ;;   (map #(.getRow table %) row-id-list)))
 
 (defn read-rows [hbase-table-name row-id-list]
-  (let [#^HTable table (hbase-table hbase-table-name)]
-    (map #(.getRow table %) row-id-list)))
+  (map #(.getRowResult (get-result-for hbase-table-name %)) row-id-list))
 
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
