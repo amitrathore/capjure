@@ -297,9 +297,8 @@
   (let [ row (read-row hbase-table-name row-id)]
     (String. (.getValue (.get row (.getBytes column-name))))))
 
-(defn table-iterator [hbase-table-name columns]
-  (let [#^HTable table (hbase-table hbase-table-name)]
-    (iterator-seq (.iterator (.getScanner table (into-array columns))))))
+(defn table-iterator [#^String hbase-table-name columns]
+    (iterator-seq (.iterator (table-scanner hbase-table-name columns))))
 
 (defn add-columns-to-scan [#^Scan scan columns]
   (doseq [#^String col columns]
