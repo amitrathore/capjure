@@ -265,7 +265,8 @@
 
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
-  (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (.getBytes end-row-id))]
+  (let [row-filter (InclusiveStopRowFilter. (.getBytes end-row-id))
+        #^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) row-filter)]
     (iterator-seq (.iterator scanner))))
 
 (defn read-rows-up-to [hbase-table-name columns start-row-id end-row-id]
