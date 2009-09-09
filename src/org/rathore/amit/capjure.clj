@@ -5,7 +5,7 @@
 	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
 	'(org.apache.hadoop.hbase.io RowResult BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.filter Filter InclusiveStopRowFilter RegExpRowFilter StopRowFilter RowFilterInterface))
+	'(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
 (def *hbase-master*)
 (def *single-column-family?*) 
@@ -265,7 +265,7 @@
 
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
-  (let [row-filter (InclusiveStopRowFilter. (.getBytes end-row-id))
+  (let [row-filter (InclusiveStopFilter. (.getBytes end-row-id))
         #^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) row-filter)]
     (iterator-seq (.iterator scanner))))
 
