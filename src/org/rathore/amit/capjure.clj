@@ -327,10 +327,11 @@
     (add-columns-to-scan scan columns)
     scan))
 
-(defn scan-for-start-and-end [columns #^bytes start-row-bytes #^bytes end-row-bytes]
-  (let [scan (Scan. start-row-bytes end-row-bytes)]
-    (add-columns-to-scan scan columns)
-    scan))
+;; not inclusive of end row id
+;; (defn scan-for-start-and-end [columns #^bytes start-row-bytes #^bytes end-row-bytes]
+;;   (let [scan (Scan. start-row-bytes end-row-bytes)]
+;;     (add-columns-to-scan scan columns)
+;;     scan))
 
 (defn scan-for-start-and-filter [columns #^bytes start-row-bytes #^Filter filter]
   (let [scan (Scan. start-row-bytes filter)]
@@ -344,9 +345,9 @@
   ([#^String hbase-table-name columns #^String start-row-string]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-start columns (.getBytes start-row-string)))))
-  ([#^String hbase-table-name columns #^bytes start-row-bytes end-row-bytes]
+  ([#^String hbase-table-name columns #^bytes start-row-bytes #^RowFilterInterface row-filter]
      (let [table (hbase-table hbase-table-name)]
-       (.getScanner table (scan-for-start-and-end columns start-row-bytes end-row-bytes)))))
+       (.getScanner table (scan-for-start-and-filter columns start-row-bytes row-filter)))))
 
 (defn hbase-row-seq [scanner]
   (let [first-row (.next scanner)]
