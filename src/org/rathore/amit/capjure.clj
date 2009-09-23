@@ -226,7 +226,7 @@
   (last (to-strings (.split (String. column-family-colon-column-name) (COLUMN-NAME-DELIMITER)))))
 
 (defn read-as-hash [hbase-table-name row-id]
-  (let [ row (read-row hbase-table-name row-id)]
+  (let [row (read-row hbase-table-name row-id)]
     (hbase-object-as-hash row)))
 
 (defn read-as-hydrated [hbase-table-name row-id]
@@ -247,21 +247,11 @@
         hbase-get-row-id (Get. (.getBytes row-id))]
     (.get table hbase-get-row-id)))
 
-(defn read-result [hbase-table-name row-id]
-  (get-result-for hbase-table-name row-id))
-  ;; (let [#^HTable table (hbase-table hbase-table-name)]
-  ;;   (.getRow table (.getBytes row-id))))
-
 (defn read-row [hbase-table-name row-id]
-  (.getRowResult (read-result hbase-table-name row-id)))
-
-(defn read-results [hbase-table-name row-id-list]
-  (map #(get-result-for hbase-table-name %) row-id-list))
-  ;; (let [#^HTable table (hbase-table hbase-table-name)]
-  ;;   (map #(.getRow table %) row-id-list)))
+  (get-result-for hbase-table-name row-id))
 
 (defn read-rows [hbase-table-name row-id-list]
-  (map #(.getRowResult (get-result-for hbase-table-name %)) row-id-list))
+  (map #(get-result-for hbase-table-name %) row-id-list))
 
 (declare table-scanner)
 (defn read-rows-between [hbase-table-name columns start-row-id end-row-id]
@@ -294,7 +284,7 @@
        (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
 
 (defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
-  (let [ hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
+  (let [hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
         available-columns (keys (.entrySet hbase-row))
         cell-versions-collector (fn [col-name] { 
                                                 (column-name-from col-name) 
@@ -308,7 +298,7 @@
     (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
-  (let [ row (read-row hbase-table-name row-id)]
+  (let [row (.getRowResult (read-row hbase-table-name row-id))]
     (String. (.getValue (.get row (.getBytes column-name))))))
 
 (defn table-iterator [#^String hbase-table-name columns]
