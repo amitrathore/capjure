@@ -238,7 +238,8 @@
     (.exists table (.getBytes row-id-string))))	
 
 (defn cell-value-as-string [row #^String column-name]
-  (let [#^Cell cell (.get row (.getBytes column-name))]
+  (let [row-result (.getRowResult row)
+        #^Cell cell (.get row-result (.getBytes column-name))]
     (if-not cell ""
 	    (String. (.getValue cell)))))
 
