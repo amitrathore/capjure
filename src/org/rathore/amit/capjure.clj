@@ -208,13 +208,20 @@
   (let [#^Set<byte[]> key-set (.keySet hbase-row-result)]
     (map (fn [#^bytes k] (String. k)) (seq key-set))))
 
+;(defn hbase-object-as-hash [hbase-result]
+;  (let [; hbase-row-result (.getRowResult hbase-result)
+;        keyset (columns-from-hbase-row-result hbase-row-result)
+;        columns-and-values (map (fn [column-name]
+;                                  {column-name (cell-value-as-string hbase-row-result column-name)})
+;                             keyset)]
+;    (apply merge columns-and-values)))
+
 (defn hbase-object-as-hash [hbase-result]
-  (let [hbase-row-result (.getRowResult hbase-result)
-        keyset (columns-from-hbase-row-result hbase-row-result)
-        columns-and-values (map (fn [column-name]
-                                  {column-name (cell-value-as-string hbase-row-result column-name)})
-                             keyset)]
-    (apply merge columns-and-values)))
+  (let [extractor (fn [kv]
+                    {(String. (.getColumn kv)) (String. (.getValue kv))})
+        key-values-objects (.list hbase-result)
+        key-values (map extractor key-values-objects)]
+    (apply merge key-values)))
 
 (defn hydrate-hbase-row [hbase-row]
   (hydrate (hbase-object-as-hash hbase-row)))
@@ -237,12 +244,19 @@
   (let [#^HTable table (hbase-table hbase-table-name)]
     (.exists table (.getBytes row-id-string))))	
 
-(defn cell-value-as-string [row #^String column-name]
-  (let [row-result (.getRowResult row)
-        #^Cell cell (.get row-result (.getBytes column-name))]
-    (if-not cell ""
-	    (String. (.getValue cell)))))
+;(defn cell-value-as-string [row #^String column-name]
+;  (let [get-cell #(.getCellValue row %1 %2)
+;        #^Cell cell (apply get-cell (family-and-qualifier-bytes column-name))]
+;    (if-not cell ""
+;	    (String. (.getValue cell)))))
 
+(defn cell-value-as-string [row #^String column-name]
+  (let [value (.getValue row (.getBytes column-name))]
+    (if value
+      (String. value)
+      ""
+      )))
+  
 (defn get-result-for [hbase-table-name #^String row-id]
   (let [#^HTable table (hbase-table hbase-table-name)
         hbase-get-row-id (Get. (.getBytes row-id))]
