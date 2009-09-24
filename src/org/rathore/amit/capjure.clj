@@ -240,10 +240,22 @@
   (let [value (.getValue row (.getBytes column-name))]
     (if-not value ""
       (String. value))))
-  
+
+(defn create-get
+  ([row-id]
+     (Get. (.getBytes row-id)))
+  ([row-id number-of-versions]
+     (let [the-get (create-get row-id)]
+       (.setMaxVersions the-get number-of-versions)
+       the-get))
+  ([row-id columns number-of-versions]
+     (let [the-get (create-get row-id number-of-versions)]
+       (.addColumns the-get (into-array (map #(.getBytes %) columns)))
+       the-get)))
+
 (defn get-result-for [hbase-table-name #^String row-id]
   (let [#^HTable table (hbase-table hbase-table-name)
-        hbase-get-row-id (Get. (.getBytes row-id))]
+        hbase-get-row-id (create-get row-id)]
     (.get table hbase-get-row-id)))
 
 (defn read-row [hbase-table-name row-id]
@@ -263,7 +275,7 @@
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
-(defn row-id-of-row [ hbase-row]
+(defn row-id-of-row [hbase-row]
   (String. (.getRow hbase-row)))
 
 (defn first-row-id [hbase-table-name column-name]
@@ -277,10 +289,10 @@
 (defn read-all-versions 
   ([hbase-table-name row-id-string number-of-versions]
      (let [#^HTable table (hbase-table hbase-table-name)]
-       (.getRow table row-id-string number-of-versions)))
+       (.get table (create-get row-id-string number-of-versions))))
   ([hbase-table-name row-id-string column-family-as-string number-of-versions]
      (let [#^HTable table (hbase-table hbase-table-name)]
-       (.getRow table row-id-string (into-array [column-family-as-string]) number-of-versions))))
+       (.get table (create-get row-id-string [column-family-as-string] number-of-versions)))))
 
 (defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
   (let [hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
