@@ -4,7 +4,7 @@
 (import '(java.util Set)
 	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
-	'(org.apache.hadoop.hbase.io RowResult BatchUpdate Cell)
+	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
 	'(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
 (def *hbase-master*)
@@ -208,14 +208,6 @@
   (let [#^Set<byte[]> key-set (.keySet hbase-row-result)]
     (map (fn [#^bytes k] (String. k)) (seq key-set))))
 
-;(defn hbase-object-as-hash [hbase-result]
-;  (let [; hbase-row-result (.getRowResult hbase-result)
-;        keyset (columns-from-hbase-row-result hbase-row-result)
-;        columns-and-values (map (fn [column-name]
-;                                  {column-name (cell-value-as-string hbase-row-result column-name)})
-;                             keyset)]
-;    (apply merge columns-and-values)))
-
 (defn hbase-object-as-hash [hbase-result]
   (let [extractor (fn [kv]
                     {(String. (.getColumn kv)) (String. (.getValue kv))})
@@ -244,18 +236,10 @@
   (let [#^HTable table (hbase-table hbase-table-name)]
     (.exists table (.getBytes row-id-string))))	
 
-;(defn cell-value-as-string [row #^String column-name]
-;  (let [get-cell #(.getCellValue row %1 %2)
-;        #^Cell cell (apply get-cell (family-and-qualifier-bytes column-name))]
-;    (if-not cell ""
-;	    (String. (.getValue cell)))))
-
 (defn cell-value-as-string [row #^String column-name]
   (let [value (.getValue row (.getBytes column-name))]
-    (if value
-      (String. value)
-      ""
-      )))
+    (if-not value ""
+      (String. value))))
   
 (defn get-result-for [hbase-table-name #^String row-id]
   (let [#^HTable table (hbase-table hbase-table-name)
@@ -313,8 +297,8 @@
     (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
-  (let [row (.getRowResult (read-row hbase-table-name row-id))]
-    (String. (.getValue (.get row (.getBytes column-name))))))
+  (let [row (read-row hbase-table-name row-id)]
+    (cell-value-as-string row column-name)))
 
 (defn table-iterator [#^String hbase-table-name columns]
     (iterator-seq (.iterator (table-scanner hbase-table-name columns))))
@@ -332,12 +316,6 @@
   (let [scan (Scan. start-row-bytes)]
     (add-columns-to-scan scan columns)
     scan))
-
-;; not inclusive of end row id
-;; (defn scan-for-start-and-end [columns #^bytes start-row-bytes #^bytes end-row-bytes]
-;;   (let [scan (Scan. start-row-bytes end-row-bytes)]
-;;     (add-columns-to-scan scan columns)
-;;     scan))
 
 (defn scan-for-start-and-filter [columns #^bytes start-row-bytes #^Filter filter]
   (let [scan (Scan. start-row-bytes filter)]
