@@ -1,6 +1,6 @@
 (ns org.rathore.amit.capjure)
 
-(use 'org.rathore.amit.utils)
+(use 'org.rathore.amit.capjure-utils)
 (import '(java.util Set)
 	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
 	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
@@ -289,24 +289,24 @@
 (defn read-all-versions 
   ([hbase-table-name row-id-string number-of-versions]
      (let [#^HTable table (hbase-table hbase-table-name)]
-       (.get table (create-get row-id-string number-of-versions))))
+       (stringify-nav-map (.getMap (.get table (create-get row-id-string number-of-versions))))))
   ([hbase-table-name row-id-string column-family-as-string number-of-versions]
      (let [#^HTable table (hbase-table hbase-table-name)]
-       (.get table (create-get row-id-string [column-family-as-string] number-of-versions)))))
+       (stringify-nav-map (.getMap (.get table (create-get row-id-string [column-family-as-string] number-of-versions)))))))
 
-(defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
-  (let [hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
-        available-columns (keys (.entrySet hbase-row))
-        cell-versions-collector (fn [col-name] { 
-                                                (column-name-from col-name) 
-                                                (map #(String. (.getValue %)) (iterator-seq (.iterator (.get hbase-row col-name)))) 
-                                                })]
-    (apply merge (map cell-versions-collector available-columns))))
+;(defn all-versions-as-hash [hbase-table-name row-id-string column-family-as-string number-of-versions]
+;  (let [hbase-row (read-all-versions hbase-table-name row-id-string column-family-as-string number-of-versions)
+;        available-columns (keys (.entrySet hbase-row))
+;        cell-versions-collector (fn [col-name] { 
+;                                  (column-name-from col-name) 
+;                                  (map #(String. (.getValue %)) (iterator-seq (.iterator (.get hbase-row col-name)))) 
+;                                })]
+;    (apply merge (map cell-versions-collector available-columns))))
 
 (defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
   (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
-        row-ids (map (fn [ rr] (row-id-of-row rr)) rows-between)]
-    (apply merge (map (fn[row-id] {row-id (all-versions-as-hash hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
+        row-ids (map (fn [rr] (row-id-of-row rr)) rows-between)]
+    (apply merge (map (fn [row-id] {row-id (read-all-versions hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
 
 (defn read-cell [hbase-table-name row-id column-name]
   (let [row (read-row hbase-table-name row-id)]
