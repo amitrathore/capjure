@@ -21,8 +21,9 @@
 
 (defn all-versions-from-map [qualifer-column c-map]
   (let [[qualifier column] (.split qualifer-column ":")
-	column (or column "")]
-    (vals ((c-map qualifier) column))))
+        column (or column "")
+        col-values-map (or (c-map qualifier) {})]
+    (or (vals (col-values-map column)) [])))
 
 (defn cell-value-from-map [qualifer-column c-map]
   (let [[qualifier column] (.split qualifer-column ":")
