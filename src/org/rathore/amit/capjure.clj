@@ -1,11 +1,11 @@
-(ns org.rathore.amit.capjure)
-
-(use 'org.rathore.amit.capjure-utils)
-(import '(java.util Set)
-	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
-	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface))
+(ns org.rathore.amit.capjure
+  (:use org.rathore.amit.capjure-utils)
+  (:use org.rathoer.amit.filter)
+  (:import [java.util Set])
+  (:import [org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor])
+  (:import [org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner])
+  (:import [org.apache.hadoop.hbase.io BatchUpdate Cell])
+  (:import [org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface]))
 
 (def *hbase-master*)
 (def *single-column-family?*) 
@@ -274,6 +274,12 @@
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
+(defn read-rows-greater-or-equal [hbase-table-name columns start-row-id]
+  (let [start-row-id-comparator (binary-comparator-for start-row-id)
+        filter-for-start-and-above (filter-for-greater-than-or-equal-to comparator)
+        scanner (table-scanner-with-filter columns filter-for-start-and-above)]
+    (iterator-seq (.iterator scanner))))
+
 (defn row-id-of-row [hbase-row]
   (String. (.getRow hbase-row)))
 
@@ -324,6 +330,11 @@
     (add-columns-to-scan scan columns)
     scan))
 
+(defn scan-and-filter [columns #^Filter filter]
+  (let [scan (scan-for-all columns)]
+    (.setFilter scan filter)
+    scan))
+
 (defn scan-for-start-and-filter [columns #^bytes start-row-bytes #^Filter filter]
   (let [scan (Scan. start-row-bytes filter)]
     (add-columns-to-scan scan columns)
@@ -340,9 +351,13 @@
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-start-to-end columns (.getBytes start-row-string) (.getBytes end-row-string))))))
 
-(defn table-scanner-with-filter [#^String hbase-table-name columns #^String start-row-string filter-object]
-  (let [table (hbase-table hbase-table-name)]
-    (.getScanner table (scan-for-start-and-filter columns (.getBytes start-row-string) filter-object))))
+(defn table-scanner-with-filter
+  ([#^String hbase-table-name columns #^Filter filter-object]
+     (let [table (hbase-table hbase-table-name)]
+       (.getScanner table (scan-and-filter columns filter-object))))
+  ([#^String hbase-table-name columns #^String start-row-string filter-object]
+     (let [table (hbase-table hbase-table-name)]
+       (.getScanner table (scan-for-start-and-filter columns (.getBytes start-row-string) filter-object)))))
 
 (defn hbase-row-seq [scanner]
   (let [first-row (.next scanner)]
