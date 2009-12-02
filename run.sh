@@ -8,7 +8,6 @@
 #   - Add all .jar files within clj_ext (~/.clojure on default)
 #     to the classpath
 #
-#
 
 if [ ! -f /etc/clojure.conf -a ! -f ~/.clojure.conf ]; then
     echo "Error: No config not found at /etc/clojure.conf or ~/.clojure.conf."
