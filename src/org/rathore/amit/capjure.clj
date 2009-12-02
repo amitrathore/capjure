@@ -1,6 +1,6 @@
 (ns org.rathore.amit.capjure
   (:use org.rathore.amit.capjure-utils)
-  (:use org.rathoer.amit.filter)
+  (:use org.rathorey.amit.filter)
   (:import [java.util Set])
   (:import [org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor])
   (:import [org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner])
@@ -272,6 +272,10 @@
 (defn read-rows-up-to [hbase-table-name columns start-row-id end-row-id]
   ;; NOTE: not inclusive of the end row
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
+    (iterator-seq (.iterator scanner))))
+
+(defn read-all-rows [hbase-table-name columns]
+  (let [scanner (table-scanner hbase-table-name columns)]
     (iterator-seq (.iterator scanner))))
 
 (defn read-rows-greater-or-equal [hbase-table-name columns start-row-id]
