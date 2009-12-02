@@ -1,6 +1,6 @@
 (ns org.rathore.amit.capjure
   (:use org.rathore.amit.capjure-utils)
-  (:use org.rathorey.amit.filter)
+  (:use org.rathore.amit.filter)
   (:import [java.util Set])
   (:import [org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor])
   (:import [org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner])
