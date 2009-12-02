@@ -280,7 +280,7 @@
 
 (defn read-rows-greater-or-equal [hbase-table-name columns start-row-id]
   (let [start-row-id-comparator (binary-comparator-for start-row-id)
-        filter-for-start-and-above (filter-for-greater-than-or-equal-to comparator)
+        filter-for-start-and-above (filter-for-greater-than-or-equal-to start-row-id-comparator)
         scanner (table-scanner-with-filter columns filter-for-start-and-above)]
     (iterator-seq (.iterator scanner))))
 
