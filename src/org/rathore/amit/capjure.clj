@@ -270,7 +270,7 @@
     (iterator-seq (.iterator scanner))))
 
 (defn read-rows-up-to [hbase-table-name columns start-row-id end-row-id]
-  ;; NOTE: not inclusive of the end row
+  "Not inclusive of the end row."
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
@@ -278,9 +278,10 @@
   (let [scanner (table-scanner hbase-table-name columns)]
     (iterator-seq (.iterator scanner))))
 
-(defn read-rows-greater-or-equal [hbase-table-name columns start-row-id]
+(defn read-rows-after-inclusive [hbase-table-name columns start-row-id]
+  "Read all rows after and including the proposed start row id."
   (let [start-row-id-comparator (binary-comparator-for start-row-id)
-        filter-for-start-and-above (filter-for-greater-than-or-equal-to start-row-id-comparator)
+        filter-for-start-and-above (filter-for-row-id-after-inclusive start-row-id-comparator)
         scanner (table-scanner-with-filter hbase-table-name columns filter-for-start-and-above)]
     (iterator-seq (.iterator scanner))))
 
