@@ -6,9 +6,9 @@
 
 ;; Includes things equal to comparator
 ;; (which is useful in a wrapper, like the WhileMatchFilter)
-(defn filter-for-equal-to [comparator]
-  (RowFilter. CompareFilter$CompareOp/EQUAL comparator))
+(defn filter-for-equal-to [the-comparator]
+  (RowFilter. CompareFilter$CompareOp/EQUAL the-comparator))
 
 ;; Includes things greater than or equal to the comparator
-(defn filter-for-greater-than-or-equal-to [comparator]
-  (RowFilter. CompareFilter$CompareOp/GREATER_OR_EQUAL comparator))
+(defn filter-for-greater-than-or-equal-to [the-comparator]
+  (RowFilter. CompareFilter$CompareOp/GREATER_OR_EQUAL the-comparator))
