@@ -1,5 +1,5 @@
 (ns org.rathore.amit.filter
-  (:use [org.apache.hadoop.hbase.filter BinaryComparator CompareFilter$CompareOp RowFilter]))
+  (:import [org.apache.hadoop.hbase.filter BinaryComparator CompareFilter$CompareOp RowFilter]))
 
 (defn binary-comparator-for [str]
   (BinaryComparator. (.getBytes str)))
