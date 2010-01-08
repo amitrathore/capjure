@@ -377,46 +377,50 @@
         _ (.set h-config "hbase.master", *hbase-master*)]
     h-config))
 
+(defn hbase-admin []
+  (HBaseAdmin. (hbase-config)))
+
 (defn create-hbase-table [#^String table-name max-versions & column-families]
   (let [desc (HTableDescriptor. table-name)
         col-desc (fn [col-family-name]
                    (let [hcdesc (HColumnDescriptor. col-family-name)]
                      (.setMaxVersions hcdesc max-versions)
-                     (.addFamily desc hcdesc)))
-        _ (doall (map col-desc column-families))
-        admin (HBaseAdmin. (hbase-config))]
-    (.createTableAsync admin desc)))
+                     (.addFamily desc hcdesc)))]
+    (doall (map col-desc column-families))
+    (.createTableAsync (hbase-admin) desc)))
 
 (defn add-hbase-columns [table-name column-family-names versions]
   (if-not (empty? column-family-names)
-	  (let [admin (HBaseAdmin. (hbase-config))
+	  (let [admin (hbase-admin)
           col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
                                     (.setMaxVersions desc versions)
                                     desc))]
 	    (.disableTable admin (.getBytes table-name))
 	    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
-	    (.enableTable admin (.getBytes table-name)))))	
+	    (.enableTable admin (.getBytes table-name)))))
 
 (defn clone-table [#^String new-hbase-table-name #^String from-hbase-table-name max-versions]
   (apply create-hbase-table new-hbase-table-name max-versions (column-families-for from-hbase-table-name)))
 
 (defn disable-table [#^String table-name]
-  (let [admin (HBaseAdmin. (hbase-config))]
-    (.disableTable admin (.getBytes table-name))))
+  (.disableTable (hbase-admin) (.getBytes table-name)))
 
 (defn enable-table [#^String table-name]
-  (let [admin (HBaseAdmin. (hbase-config))]
-    (.enableTable admin (.getBytes table-name))))	
+  (.enableTable (hbase-admin) (.getBytes table-name)))
 
 (defn drop-hbase-table [#^String hbase-table-name]
-  (let [admin (HBaseAdmin. (hbase-config))]
-    (.deleteTable hbase-table-name)))
+  (.deleteTable (hbase-admin) hbase-table-name))
 
 (defn hbase-table [#^String hbase-table-name]
-  (let [h-config (hbase-config)
-        table (HTable. h-config hbase-table-name)]
+  (let [table (HTable. (hbase-config) hbase-table-name)]
     (.setScannerCaching table 1000)
     table))
+
+(defn table-exists?
+  ([table-name]
+     (table-exists? table-name (hbase-admin)))
+  ([table-name hadmin]
+     (.tableExists hadmin table-name)))
 
 (defmacro with-hbase-table [[table hbase-table-name] & exprs]
   `(let [~table (hbase-table ~hbase-table-name)]
