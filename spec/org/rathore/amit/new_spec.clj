@@ -17,8 +17,6 @@
 
 (deftest test-flatten-simple-elements
   (let [flattened (flatten consumer-event)]
-    (doall (map println (filter (fn [[k v]]
-                                  (.startsWith k "meta:inserts")) flattened)))
     (is (= (flattened "meta:api__") "0.0.1.0"))
     (is (= (flattened "meta:event_type__") "inserts"))
     (is (= (flattened "meta:merchant__name") "Portable Folding Chairs"))
@@ -41,15 +39,58 @@
     (is (= (flattened "meta:inserts_merchant_unit_price__EZ-30DC-HD@viewed_product_detail") 109.95))
     (is (= (flattened "meta:inserts_campaign_id__EZ-30DC-HD@viewed_aggregate") 10))))
 
+(deftest test-hydration
+  (let [flattened (flatten consumer-event)
+        hydrated (hydrate flattened)
+        inserts (hydrated :inserts)]
+    (println hydrated)
+    (is (= (get-in hydrated [:merchant :name]) "Portable Folding Chairs"))
+    (is (= (get-in hydrated [:merchant :id]) "14"))
+
+    (is (= (get-in hydrated [:active_campaigns]) ["7"]))
+    (is (= (get-in hydrated [:event_type]) "inserts"))
+    (is (= (get-in hydrated [:api]) "0.0.1.0"))
+
+    (is (= (get-in hydrated [:consumer :email_address]) "6846821c-c6af-3052-cbf7-7a465c27aa69@interested.cinchcorp.com"))
+    (is (= (get-in hydrated [:consumer :id]) "36799"))
+    (is (= (get-in hydrated [:consumer :kind]) "interested"))
+
+    (is (= (get-in hydrated [:page :referrer]) "http://chairs.vasanta.hq.cinchcorp.com/directors-chairs-c-1.html"))
+    (is (= (get-in hydrated [:page :request_url]) "http://chairs.vasanta.hq.cinchcorp.com/heavy-duty-3034-aluminum-frame-directors-chair-p-86.html"))
+    (is (= (get-in hydrated [:page :merchant_template_name]) "productinfo"))
+
+    (is (= (:html_id (first inserts)) "cinch_id_1233794973978"))
+    (is (= (:cinch_unit_price (first inserts)) "98.95"))
+    (is (= (:campaign_id (first inserts)) "10"))
+    (is (= (:action_id (first inserts)) "2002"))
+    (is (= (:insert_type (first inserts)) "viewed_product_detail"))
+    (is (= (:merchant_product_id (first inserts)) "EZ-30DC-HD"))
+
+    (is (= (:html_id (second inserts)) "cinch_id_1233794973977"))
+    (is (= (:cinch_unit_price (second inserts)) "98.95"))
+    (is (= (:campaign_id (second inserts)) "10"))
+    (is (= (:action_id (second inserts)) "2001"))
+    (is (= (:insert_type (second inserts)) "viewed_aggregate"))
+    (is (= (:merchant_product_id (second inserts)) "EZ-30DC-HD"))
+
+    
+    ))
+
 (def encoders (config-keys
   (config-for :inserts 
               :merchant_product_id
               (fn [i-map]
                 (str (i-map :merchant_product_id) "@" (i-map :insert_type))))))
 
+(def decoders (config-keys
+  (config-for :inserts 
+              :merchant_product_id
+              (fn [value]
+                (first (.split value "@"))))))
+
 
 (defn run-capjure-tests []
-  (binding [*primary-keys-config* {:encode encoders}
+  (binding [*primary-keys-config* {:encode encoders :decode decoders} 
             *single-column-family?* true
             *hbase-single-column-family* "meta"]
     (run-tests)))
