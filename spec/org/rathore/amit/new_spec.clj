@@ -15,6 +15,9 @@
       :consumer {:id "36799" :kind "interested" :email_address "6846821c-c6af-3052-cbf7-7a465c27aa69@interested.cinchcorp.com"}
       :api "0.0.1.0"})
 
+(defn assert-equal-in-hashes [hash1 hash2 & ks]
+  (is (= (get-in hash1 ks) (get-in hash2 ks))))
+
 (deftest test-flatten-simple-elements
   (let [flattened (flatten consumer-event)]
     (is (= (flattened "meta:api__") "0.0.1.0"))
@@ -43,7 +46,6 @@
   (let [flattened (flatten consumer-event)
         hydrated (hydrate flattened)
         inserts (hydrated :inserts)]
-    (println hydrated)
     (is (= (get-in hydrated [:merchant :name]) "Portable Folding Chairs"))
     (is (= (get-in hydrated [:merchant :id]) "14"))
 
@@ -71,10 +73,20 @@
     (is (= (:campaign_id (second inserts)) "10"))
     (is (= (:action_id (second inserts)) "2001"))
     (is (= (:insert_type (second inserts)) "viewed_aggregate"))
-    (is (= (:merchant_product_id (second inserts)) "EZ-30DC-HD"))
+    (is (= (:merchant_product_id (second inserts)) "EZ-30DC-HD"))))
 
-    
-    ))
+(deftest test-single-column-based-persistence
+  (delete-all "capjure_test" "capjure_test_row_id")
+  (is (.isEmpty (read-row "capjure_test" "capjure_test_row_id")))
+  (capjure-insert consumer-event "capjure_test" "capjure_test_row_id")
+  (let [from-db (read-as-hydrated "capjure_test" "capjure_test_row_id")]
+    (assert-equal-in-hashes consumer-event from-db [:merchant :name])
+    (assert-equal-in-hashes consumer-event from-db [:api])
+    (assert-equal-in-hashes consumer-event from-db [:active_campaigns])
+    (assert-equal-in-hashes (first (:inserts consumer-event)) (first (:inserts from-db)) [:html_id])    
+    (assert-equal-in-hashes (first (:inserts consumer-event)) (first (:inserts from-db)) [:insert_type])    
+    (assert-equal-in-hashes (second (:inserts consumer-event)) (second (:inserts from-db)) [:html_id])    
+    (assert-equal-in-hashes (second (:inserts consumer-event)) (second (:inserts from-db)) [:insert_type])))
 
 (def encoders (config-keys
   (config-for :inserts 
@@ -88,9 +100,9 @@
               (fn [value]
                 (first (.split value "@"))))))
 
-
 (defn run-capjure-tests []
-  (binding [*primary-keys-config* {:encode encoders :decode decoders} 
+  (binding [*hbase-master* "localhost"
+            *primary-keys-config* {:encode encoders :decode decoders} 
             *single-column-family?* true
             *hbase-single-column-family* "meta"]
     (run-tests)))
