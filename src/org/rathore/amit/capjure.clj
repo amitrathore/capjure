@@ -196,7 +196,8 @@
         #^String inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
         primary-key-name (qualifier-for outer-key)
         inner-map (or (hydrated outer-key) {})
-        inner-object (or (inner-map column-name) {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
+        inner-object (or (inner-map column-name) 
+                         {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
     (assoc hydrated outer-key 
 	    (assoc inner-map column-name
 		    (assoc inner-object (symbolize inner-key) value)))))
@@ -208,9 +209,8 @@
 (defn hbase-object-as-hash [hbase-result]
   (let [extractor (fn [kv]
                     {(String. (.getColumn kv)) (String. (.getValue kv))})
-        key-values-objects (.list hbase-result)
-        key-values (map extractor key-values-objects)]
-    (apply merge key-values)))
+        key-values-objects (.list hbase-result)]
+    (apply merge (map extractor key-values-objects))))
 
 (defn hydrate-hbase-row [hbase-row]
   (hydrate (hbase-object-as-hash hbase-row)))
@@ -222,12 +222,10 @@
   (last (tokenize-column-name column-family-colon-column-name)))
 
 (defn read-as-hash [hbase-table-name row-id]
-  (let [row (read-row hbase-table-name row-id)]
-    (hbase-object-as-hash row)))
+  (hbase-object-as-hash (read-row hbase-table-name row-id)))
 
 (defn read-as-hydrated [hbase-table-name row-id]
-  (let [as-hash (read-as-hash hbase-table-name row-id)]
-    (hydrate as-hash)))	
+  (hydrate (read-as-hash hbase-table-name row-id)))	
 
 (defn row-exists? [hbase-table-name row-id-string]
   (let [#^HTable table (hbase-table hbase-table-name)]
@@ -387,9 +385,10 @@
 (defn add-hbase-columns [table-name column-family-names versions]
   (if-not (empty? column-family-names)
 	  (let [admin (hbase-admin)
-          col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
-                                    (.setMaxVersions desc versions)
-                                    desc))]
+                col-desc (fn [col-name] 
+                           (let [desc (HColumnDescriptor. col-name)]
+                             (.setMaxVersions desc versions)
+                             desc))]
 	    (.disableTable admin (.getBytes table-name))
 	    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
 	    (.enableTable admin (.getBytes table-name)))))
