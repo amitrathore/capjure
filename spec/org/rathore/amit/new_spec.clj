@@ -1,4 +1,4 @@
-(ns capjure-spec
+(ns new-capjure-spec
   (:use clojure.test)
   (:use org.rathore.amit.capjure)
   (:use org.rathore.amit.capjure-init))
@@ -101,8 +101,7 @@
                 (first (.split value "@"))))))
 
 (defn run-capjure-tests []
-  (binding [*hbase-master* "localhost"
-            *primary-keys-config* {:encode encoders :decode decoders} 
+  (binding [*primary-keys-config* {:encode encoders :decode decoders} 
             *single-column-family?* true
             *hbase-single-column-family* "meta"]
     (run-tests)))

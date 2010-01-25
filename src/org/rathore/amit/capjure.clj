@@ -3,8 +3,9 @@
 (use 'org.rathore.amit.capjure-utils)
 (import '(java.util Set)
 	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
+	'(org.apache.hadoop.hbase.client Put Get HBaseAdmin HTable Scan Scanner)
 	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
+	'(org.apache.hadoop.hbase.util Bytes)
 	'(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface))
 
 (def *hbase-master*)
@@ -51,19 +52,15 @@
 
 (defn capjure-insert [object-to-save hbase-table-name row-id]
   (let [#^HTable table (hbase-table hbase-table-name)
-        batch-update (BatchUpdate. (str row-id))
+        put (Put. (Bytes/toBytes row-id))
         flattened (flatten object-to-save)]
-    (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)))
+    (add-to-insert-batch put flattened)
+    (.put table put)))
 
-(defn add-to-insert-batch [#^BatchUpdate batch-update flattened-list]
-  (loop [flattened-pairs flattened-list]
-    (if (not (empty? flattened-pairs))
-      (let [first-pair (first flattened-pairs)
-            column (first first-pair)
-            value (last first-pair)]
-        (.put batch-update column (.getBytes (str value)))
-        (recur (rest flattened-pairs))))))
+(defn add-to-insert-batch [put flattened-list]
+  (doseq [[column value] flattened-list]
+    (let [[family qualifier] (.split column ":")]
+      (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (Bytes/toBytes value)))))
 
 (defmemoized symbol-name [prefix]
   (if (keyword? prefix) 
@@ -373,9 +370,7 @@
   (map #(String. %) (.keySet result-row)))
 
 (defmemoized hbase-config []
-  (let [h-config (HBaseConfiguration.) 	
-        _ (.set h-config "hbase.master", *hbase-master*)]
-    h-config))
+  (HBaseConfiguration.))
 
 (defn hbase-admin []
   (HBaseAdmin. (hbase-config)))

@@ -1,6 +1,6 @@
 (ns capjure-spec)
 
-(use 'clojure.contrib.test-is)
+(use 'clojure.test)
 (require '(org.danlarkin [json :as json]))
 (use 'org.rathore.amit.capjure)
 
@@ -50,6 +50,7 @@
   (let [to-process {:inserts [{:merchant_product_id "kel-10-ab" :merchant_price "11.00" :cinch_price "9.95"}
 			      {:merchant_product_id "sut-91-xy" :merchant_price "8.00" :cinch_price "6.55"}]}
 	processed (flatten to-process)]
+    (println processed)
     (is (= (count (keys processed)) 4))
     (is-same-sequence (keys processed) '("inserts_merchant_price:kel-10-ab" "inserts_cinch_price:kel-10-ab" "inserts_merchant_price:sut-91-xy" "inserts_cinch_price:sut-91-xy"))
     (is (= (processed "inserts_merchant_price:kel-10-ab") "11.00"))
@@ -104,3 +105,4 @@
     (is (= (cart-item "sku") "OB-BW-LNGR (RED) LL"))
     (is (= (cart-item "merchant_product_id") "OB-BW-LNGR"))))
 	     
+

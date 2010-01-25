@@ -1,5 +1,5 @@
-(use 'clojure.contrib.test-is)
-(load-file "spec/org/rathore/amit/capjure_spec.clj")
+(use 'clojure.test)
+(load-file "/Users/amit/workspace/capjure/spec/org/rathore/amit/capjure_spec.clj")
 
 (in-ns 'capjure-spec)
 (use 'org.rathore.amit.capjure-init)
@@ -29,7 +29,8 @@
 		 :else value)))))
 
 (def keys-config {:encode encoders :decode decoders})
-(binding [*hbase-master* "tank.cinchcorp.com:60000"
-	  *primary-keys-config* keys-config]
-  (run-tests)
-  (shutdown-agents))
+
+(defn run-suite []
+  (binding [*hbase-master* "tank.cinchcorp.com:60000"
+            *primary-keys-config* keys-config]
+    (run-tests)))
