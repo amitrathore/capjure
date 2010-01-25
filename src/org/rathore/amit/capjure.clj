@@ -1,12 +1,11 @@
-(ns org.rathore.amit.capjure)
-
-(use 'org.rathore.amit.capjure-utils)
-(import '(java.util Set)
-	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	'(org.apache.hadoop.hbase.client Put Get HBaseAdmin HTable Scan Scanner)
-	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.util Bytes)
-	'(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface))
+(ns org.rathore.amit.capjure
+  (:use org.rathore.amit.capjure-utils)
+  (:import (java.util Set)
+	(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
+	(org.apache.hadoop.hbase.client Put Get HBaseAdmin HTable Scan Scanner)
+	(org.apache.hadoop.hbase.io BatchUpdate Cell)
+	(org.apache.hadoop.hbase.util Bytes)
+	(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface)))
 
 (def *hbase-master*)
 (def *single-column-family?*) 
