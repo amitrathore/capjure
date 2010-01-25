@@ -148,29 +148,30 @@
                             {(.substring key prefix-length) value})]
       (apply merge (map prefix-stripper flattened-and-prepended)))))
 
+(defn tokenize-column-name [full-column-name]
+  (seq (.split full-column-name (COLUMN-NAME-DELIMITER))))
+
 (defn collapse-for-hydration [mostly-hydrated]
-  (let [primary-keys (to-array (all-primary-keys))]
-    (areduce primary-keys idx ret mostly-hydrated
-	     (let [primary-key (symbol-name (aget primary-keys idx))
-             inner-map (ret primary-key)
-             inner-values (apply vector (vals inner-map))]
-	       (if (empty? inner-values) 
-           ret
-           (assoc ret primary-key inner-values))))))
+  (reduce (fn [ret key]
+            (let [primary-key (symbol-name key)
+                 inner-map (ret primary-key)
+                 inner-values (apply vector (vals inner-map))]
+              (assoc ret primary-key inner-values)))
+          mostly-hydrated (all-primary-keys)))
 
 (defn hydrate [flattened-and-prepended]
   (let [flattened-object (strip-prefixes flattened-and-prepended)
-        flat-keys (to-array (keys flattened-object))
-        mostly-hydrated (areduce flat-keys idx ret {}
-                          (hydrate-pair (aget flat-keys idx) flattened-object ret))
-        pair-symbolizer (fn [[key value]] {(symbolize key) value})]
+        flat-keys (keys flattened-object)
+        mostly-hydrated (reduce (fn [ret key]
+                                   (hydrate-pair key flattened-object ret))
+                                {} flat-keys)
+        pair-symbolizer (fn [[key value]] 
+                          {(symbolize key) value})]
     (apply merge (map pair-symbolizer (collapse-for-hydration mostly-hydrated)))))
 
 (defn hydrate-pair [#^String key-name flattened hydrated]
   (let [#^String value (.trim (str (flattened key-name)))
-        key-tokens (seq (.split key-name (COLUMN-NAME-DELIMITER)))
-        #^String column-family (first key-tokens)
-        #^String column-name (last key-tokens)]
+        [#^String column-family #^String column-name] (tokenize-column-name key-name)]
     (cond
       (= column-name value) (has-many-strings-hydration hydrated column-family value)
       (is-from-primary-keys column-family) (has-many-objects-hydration hydrated column-family column-name value)
@@ -219,7 +220,7 @@
   (map #(String. %) array-of-byte-arrays))
 
 (defn column-name-from [column-family-colon-column-name]
-  (last (to-strings (.split (String. column-family-colon-column-name) (COLUMN-NAME-DELIMITER)))))
+  (last (tokenize-column-name column-family-colon-column-name)))
 
 (defn read-as-hash [hbase-table-name row-id]
   (let [row (read-row hbase-table-name row-id)]
@@ -366,7 +367,7 @@
         table-descriptor (.getTableDescriptor table)]
     (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
 
-(defn column-names-as-strings [ result-row]
+(defn column-names-as-strings [result-row]
   (map #(String. %) (.keySet result-row)))
 
 (defmemoized hbase-config []
