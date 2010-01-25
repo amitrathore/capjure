@@ -183,14 +183,13 @@
 
 (defn has-one-object-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [value-map (or (hydrated column-family) {})]
-    (assoc hydrated column-family
-	   (assoc value-map (symbolize column-name) value))))
+    (assoc-in hydrated [column-family (symbolize column-name)] value)))
 
 (defn has-many-strings-hydration [hydrated #^String column-family #^String value]
   (let [old-value (hydrated column-family)]
     (if (nil? old-value) 
       (assoc hydrated (symbolize column-family) [value])
-      (assoc hydrated (symbolize column-family) (apply vector (seq (cons value old-value)))))))
+      (assoc hydrated (symbolize column-family) (conj old-value value)))))
 
 (defn has-many-objects-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [#^String outer-key (primary-key column-family)
