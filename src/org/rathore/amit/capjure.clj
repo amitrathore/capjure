@@ -124,11 +124,11 @@
                           {(str prefix key) value})]
       (apply merge (map key-prepender flattened)))))
   
-(defn flatten [bloated_object]
+(defn flatten [bloated-object]
   (let [f (apply merge (map 
-			(fn [pair] 
-			  (process-key-value (first pair) (last pair)))
-			(seq bloated_object)))]
+			(fn [[k v]] 
+			  (process-key-value k v))
+			bloated-object))]
     (prepend-keys-for-single-column-family f)))
     
 (declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
