@@ -92,10 +92,9 @@
     :else {(new-key key (COLUMN-NAME-DELIMITER) "") value}))
 
 (defn process-multiple [key values]
-  (let [all (seq values)]
-    (if (map? (first all)) 
-      (process-maps key all)
-      (process-strings key (to-array all)))))
+  (if (map? (first values)) 
+    (process-maps key values)
+    (process-strings key values)))
 
 (defn process-maps [key maps]
   (let [qualifier (qualifier-for key)
@@ -113,8 +112,9 @@
         (single-map (aget all-keys idx))))))
 
 (defn process-strings [key strings] 
-  (areduce strings idx ret {}
-	  (assoc ret (new-key key (COLUMN-NAME-DELIMITER) (aget strings idx)) (aget strings idx))))
+  (reduce (fn [ret the-string] 
+            (assoc ret (new-key key (COLUMN-NAME-DELIMITER) the-string) the-string))  
+          {} strings))
 
 (defn prepend-keys-for-single-column-family [flattened]
   (if-not *single-column-family?*
