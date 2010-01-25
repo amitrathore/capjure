@@ -18,7 +18,7 @@
 (defn assert-equal-in-hashes [hash1 hash2 & ks]
   (is (= (get-in hash1 ks) (get-in hash2 ks))))
 
-(deftest test-flatten-simple-elements
+(deftest test-flatten-single-family-and-simple-elements
   (let [flattened (flatten consumer-event)]
     (is (= (flattened "meta:api__") "0.0.1.0"))
     (is (= (flattened "meta:event_type__") "inserts"))
@@ -27,7 +27,17 @@
     (is (= (flattened "meta:page__merchant_template_name") "productinfo"))
     (is (= (flattened "meta:consumer__id") "36799"))))
 
-(deftest test-flatten-has-many-hashes
+(deftest test-flatten-multiple-family-and-simple-elements
+  (binding [*single-column-family?* false]
+    (let [flattened (flatten consumer-event)]
+      (is (= (flattened "api:") "0.0.1.0"))
+      (is (= (flattened "event_type:") "inserts"))
+      (is (= (flattened "merchant:name") "Portable Folding Chairs"))
+      (is (= (flattened "http_client:browser") "Firefox"))
+      (is (= (flattened "page:merchant_template_name") "productinfo"))
+      (is (= (flattened "consumer:id") "36799")))))
+
+(deftest test-flatten-single-family-and-has-many-hashes
   (let [flattened (flatten consumer-event)]
     (is (= (flattened "meta:inserts_campaign_id__EZ-30DC-HD@viewed_product_detail") 10))
     (is (= (flattened "meta:inserts_merchant_unit_price__EZ-30DC-HD@viewed_aggregate") 109.95))
@@ -41,6 +51,22 @@
     (is (= (flattened "meta:inserts_action_id__EZ-30DC-HD@viewed_product_detail") 2002))
     (is (= (flattened "meta:inserts_merchant_unit_price__EZ-30DC-HD@viewed_product_detail") 109.95))
     (is (= (flattened "meta:inserts_campaign_id__EZ-30DC-HD@viewed_aggregate") 10))))
+
+(deftest test-flatten-multiple-family-and-has-many-hashes
+  (binding [*single-column-family?* false]
+    (let [flattened (flatten consumer-event)]
+      (is (= (flattened "inserts_campaign_id:EZ-30DC-HD@viewed_product_detail") 10))
+      (is (= (flattened "inserts_merchant_unit_price:EZ-30DC-HD@viewed_aggregate") 109.95))
+      (is (= (flattened "inserts_action_id:EZ-30DC-HD@viewed_aggregate") 2001))
+      (is (= (flattened "inserts_html_id:EZ-30DC-HD@viewed_product_detail") "cinch_id_1233794973978"))
+      (is (= (flattened "inserts_insert_type:EZ-30DC-HD@viewed_aggregate") "viewed_aggregate"))
+      (is (= (flattened "inserts_cinch_unit_price:EZ-30DC-HD@viewed_product_detail") 98.95))
+      (is (= (flattened "inserts_cinch_unit_price:EZ-30DC-HD@viewed_aggregate") 98.95))
+      (is (= (flattened "inserts_insert_type:EZ-30DC-HD@viewed_product_detail") "viewed_product_detail"))
+      (is (= (flattened "inserts_html_id:EZ-30DC-HD@viewed_aggregate") "cinch_id_1233794973977"))
+      (is (= (flattened "inserts_action_id:EZ-30DC-HD@viewed_product_detail") 2002))
+      (is (= (flattened "inserts_merchant_unit_price:EZ-30DC-HD@viewed_product_detail") 109.95))
+      (is (= (flattened "inserts_campaign_id:EZ-30DC-HD@viewed_aggregate") 10)))))
 
 (deftest test-hydration
   (let [flattened (flatten consumer-event)

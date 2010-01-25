@@ -71,18 +71,18 @@
   (str (symbol-name part1) separator (symbol-name part2)))
 
 (defn prepend-to-keys [prefix separator hash-map]
-  (let [all-keys (to-array (keys hash-map))]
-    (areduce all-keys idx ret {} 
-	     (assoc ret 
-	       (new-key prefix separator (aget all-keys idx))
-	       (hash-map (aget all-keys idx))))))
+  (reduce (fn [ret key] 
+            (assoc ret 
+              (new-key prefix separator key)
+              (hash-map key)))
+          {} (keys hash-map)))
 
 (defn postpend-to-keys [postfix separator hash-map]
-  (let [all-keys (to-array (keys hash-map))]
-    (areduce all-keys idx ret {} 
-	     (assoc ret 
-	       (new-key (aget all-keys idx) separator postfix)
-	       (hash-map (aget all-keys idx))))))
+  (reduce (fn [ret key]
+            (assoc ret 
+              (new-key key separator postfix)
+              (hash-map key))) 
+          {} (keys hash-map)))
 
 (declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
