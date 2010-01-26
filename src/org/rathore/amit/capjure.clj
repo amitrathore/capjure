@@ -185,7 +185,7 @@
     (assoc-in hydrated [column-family (symbolize column-name)] value)))
 
 (defn has-many-strings-hydration [hydrated #^String column-family #^String value]
-  (let [old-value (hydrated column-family)]
+  (let [old-value (hydrated (symbolize column-family))]
     (if (nil? old-value) 
       (assoc hydrated (symbolize column-family) [value])
       (assoc hydrated (symbolize column-family) (conj old-value value)))))

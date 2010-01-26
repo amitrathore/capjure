@@ -18,6 +18,9 @@
 (defn assert-equal-in-hashes [hash1 hash2 & ks]
   (is (= (get-in hash1 ks) (get-in hash2 ks))))
 
+(defn is-same-sequence [seqa seqb]
+  (is (= (sort seqa) (sort seqb))))
+
 (deftest test-flatten-single-family-and-simple-elements
   (let [flattened (flatten consumer-event)]
     (is (= (flattened "meta:api__") "0.0.1.0"))
@@ -75,7 +78,7 @@
     (is (= (get-in hydrated [:merchant :name]) "Portable Folding Chairs"))
     (is (= (get-in hydrated [:merchant :id]) "14"))
 
-    (is (= (get-in hydrated [:active_campaigns]) ["7"]))
+    (is-same-sequence (get-in hydrated [:active_campaigns]) ["3" "4" "7" "10" "11" "13"])
     (is (= (get-in hydrated [:event_type]) "inserts"))
     (is (= (get-in hydrated [:api]) "0.0.1.0"))
 
