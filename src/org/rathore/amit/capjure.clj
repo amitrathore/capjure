@@ -373,8 +373,7 @@
   (map #(String. %) (.keySet result-row)))
 
 (defn hbase-config []
-  (let [h-config (HBaseConfiguration.) 	
-        _ (.set h-config "hbase.master", *hbase-master*)]
+  (let [h-config (HBaseConfiguration.)]
     h-config))
 
 (defn hbase-admin []
