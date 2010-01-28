@@ -372,7 +372,7 @@
 (defn column-names-as-strings [ result-row]
   (map #(String. %) (.keySet result-row)))
 
-(defn hbase-config []
+(defmemoized hbase-config []
   (let [h-config (HBaseConfiguration.)]
     h-config))
 
