@@ -1,11 +1,11 @@
-(ns org.rathore.amit.capjure)
-
-(use 'org.rathore.amit.capjure-utils)
-(import '(java.util Set)
-	'(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	'(org.apache.hadoop.hbase.client Get HBaseAdmin HTable Scan Scanner)
-	'(org.apache.hadoop.hbase.io BatchUpdate Cell)
-	'(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface))
+(ns org.rathore.amit.capjure
+  (:use org.rathore.amit.capjure-utils)
+  (:import (java.util Set)
+	(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
+	(org.apache.hadoop.hbase.client Put Get HBaseAdmin HTable Scan Scanner)
+	(org.apache.hadoop.hbase.io BatchUpdate Cell)
+	(org.apache.hadoop.hbase.util Bytes)
+	(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface)))
 
 (def *hbase-master*)
 (def *single-column-family?*) 
@@ -51,19 +51,15 @@
 
 (defn capjure-insert [object-to-save hbase-table-name row-id]
   (let [#^HTable table (hbase-table hbase-table-name)
-        batch-update (BatchUpdate. (str row-id))
+        put (Put. (Bytes/toBytes row-id))
         flattened (flatten object-to-save)]
-    (add-to-insert-batch batch-update flattened)
-    (.commit table batch-update)))
+    (add-to-insert-batch put flattened)
+    (.put table put)))
 
-(defn add-to-insert-batch [#^BatchUpdate batch-update flattened-list]
-  (loop [flattened-pairs flattened-list]
-    (if (not (empty? flattened-pairs))
-      (let [first-pair (first flattened-pairs)
-            column (first first-pair)
-            value (last first-pair)]
-        (.put batch-update column (.getBytes (str value)))
-        (recur (rest flattened-pairs))))))
+(defn add-to-insert-batch [put flattened-list]
+  (doseq [[column value] flattened-list]
+    (let [[family qualifier] (.split column ":")]
+      (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (Bytes/toBytes value)))))
 
 (defmemoized symbol-name [prefix]
   (if (keyword? prefix) 
@@ -74,18 +70,18 @@
   (str (symbol-name part1) separator (symbol-name part2)))
 
 (defn prepend-to-keys [prefix separator hash-map]
-  (let [all-keys (to-array (keys hash-map))]
-    (areduce all-keys idx ret {} 
-	     (assoc ret 
-	       (new-key prefix separator (aget all-keys idx))
-	       (hash-map (aget all-keys idx))))))
+  (reduce (fn [ret key] 
+            (assoc ret 
+              (new-key prefix separator key)
+              (hash-map key)))
+          {} (keys hash-map)))
 
 (defn postpend-to-keys [postfix separator hash-map]
-  (let [all-keys (to-array (keys hash-map))]
-    (areduce all-keys idx ret {} 
-	     (assoc ret 
-	       (new-key (aget all-keys idx) separator postfix)
-	       (hash-map (aget all-keys idx))))))
+  (reduce (fn [ret key]
+            (assoc ret 
+              (new-key key separator postfix)
+              (hash-map key))) 
+          {} (keys hash-map)))
 
 (declare process-multiple process-maps process-map process-strings)
 (defn process-key-value [key value]
@@ -95,10 +91,9 @@
     :else {(new-key key (COLUMN-NAME-DELIMITER) "") value}))
 
 (defn process-multiple [key values]
-  (let [all (seq values)]
-    (if (map? (first all)) 
-      (process-maps key all)
-      (process-strings key (to-array all)))))
+  (if (map? (first values)) 
+    (process-maps key values)
+    (process-strings key values)))
 
 (defn process-maps [key maps]
   (let [qualifier (qualifier-for key)
@@ -116,8 +111,9 @@
         (single-map (aget all-keys idx))))))
 
 (defn process-strings [key strings] 
-  (areduce strings idx ret {}
-	  (assoc ret (new-key key (COLUMN-NAME-DELIMITER) (aget strings idx)) (aget strings idx))))
+  (reduce (fn [ret the-string] 
+            (assoc ret (new-key key (COLUMN-NAME-DELIMITER) the-string) the-string))  
+          {} strings))
 
 (defn prepend-keys-for-single-column-family [flattened]
   (if-not *single-column-family?*
@@ -127,11 +123,11 @@
                           {(str prefix key) value})]
       (apply merge (map key-prepender flattened)))))
   
-(defn flatten [bloated_object]
+(defn flatten [bloated-object]
   (let [f (apply merge (map 
-			(fn [pair] 
-			  (process-key-value (first pair) (last pair)))
-			(seq bloated_object)))]
+			(fn [[k v]] 
+			  (process-key-value k v))
+			bloated-object))]
     (prepend-keys-for-single-column-family f)))
     
 (declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
@@ -151,29 +147,30 @@
                             {(.substring key prefix-length) value})]
       (apply merge (map prefix-stripper flattened-and-prepended)))))
 
+(defn tokenize-column-name [full-column-name]
+  (seq (.split full-column-name (COLUMN-NAME-DELIMITER))))
+
 (defn collapse-for-hydration [mostly-hydrated]
-  (let [primary-keys (to-array (all-primary-keys))]
-    (areduce primary-keys idx ret mostly-hydrated
-	     (let [primary-key (symbol-name (aget primary-keys idx))
-             inner-map (ret primary-key)
-             inner-values (apply vector (vals inner-map))]
-	       (if (empty? inner-values) 
-           ret
-           (assoc ret primary-key inner-values))))))
+  (reduce (fn [ret key]
+            (let [primary-key (symbol-name key)
+                 inner-map (ret primary-key)
+                 inner-values (apply vector (vals inner-map))]
+              (assoc ret primary-key inner-values)))
+          mostly-hydrated (all-primary-keys)))
 
 (defn hydrate [flattened-and-prepended]
   (let [flattened-object (strip-prefixes flattened-and-prepended)
-        flat-keys (to-array (keys flattened-object))
-        mostly-hydrated (areduce flat-keys idx ret {}
-                          (hydrate-pair (aget flat-keys idx) flattened-object ret))
-        pair-symbolizer (fn [[key value]] {(symbolize key) value})]
+        flat-keys (keys flattened-object)
+        mostly-hydrated (reduce (fn [ret key]
+                                   (hydrate-pair key flattened-object ret))
+                                {} flat-keys)
+        pair-symbolizer (fn [[key value]] 
+                          {(symbolize key) value})]
     (apply merge (map pair-symbolizer (collapse-for-hydration mostly-hydrated)))))
 
 (defn hydrate-pair [#^String key-name flattened hydrated]
   (let [#^String value (.trim (str (flattened key-name)))
-        key-tokens (seq (.split key-name (COLUMN-NAME-DELIMITER)))
-        #^String column-family (first key-tokens)
-        #^String column-name (last key-tokens)]
+        [#^String column-family #^String column-name] (tokenize-column-name key-name)]
     (cond
       (= column-name value) (has-many-strings-hydration hydrated column-family value)
       (is-from-primary-keys column-family) (has-many-objects-hydration hydrated column-family column-name value)
@@ -185,21 +182,21 @@
 
 (defn has-one-object-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [value-map (or (hydrated column-family) {})]
-    (assoc hydrated column-family
-	   (assoc value-map (symbolize column-name) value))))
+    (assoc-in hydrated [column-family (symbolize column-name)] value)))
 
 (defn has-many-strings-hydration [hydrated #^String column-family #^String value]
-  (let [old-value (hydrated column-family)]
+  (let [old-value (hydrated (symbolize column-family))]
     (if (nil? old-value) 
       (assoc hydrated (symbolize column-family) [value])
-      (assoc hydrated (symbolize column-family) (apply vector (seq (cons value old-value)))))))
+      (assoc hydrated (symbolize column-family) (conj old-value value)))))
 
 (defn has-many-objects-hydration [hydrated #^String column-family #^String column-name #^String value]
   (let [#^String outer-key (primary-key column-family)
         #^String inner-key (.substring column-family (+ 1 (count outer-key)) (count column-family))
         primary-key-name (qualifier-for outer-key)
         inner-map (or (hydrated outer-key) {})
-        inner-object (or (inner-map column-name) {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
+        inner-object (or (inner-map column-name) 
+                         {(symbolize (symbol-name primary-key-name)) (decode-with-key outer-key column-name)})]
     (assoc hydrated outer-key 
 	    (assoc inner-map column-name
 		    (assoc inner-object (symbolize inner-key) value)))))
@@ -211,9 +208,8 @@
 (defn hbase-object-as-hash [hbase-result]
   (let [extractor (fn [kv]
                     {(String. (.getColumn kv)) (String. (.getValue kv))})
-        key-values-objects (.list hbase-result)
-        key-values (map extractor key-values-objects)]
-    (apply merge key-values)))
+        key-values-objects (.list hbase-result)]
+    (apply merge (map extractor key-values-objects))))
 
 (defn hydrate-hbase-row [hbase-row]
   (hydrate (hbase-object-as-hash hbase-row)))
@@ -222,15 +218,13 @@
   (map #(String. %) array-of-byte-arrays))
 
 (defn column-name-from [column-family-colon-column-name]
-  (last (to-strings (.split (String. column-family-colon-column-name) (COLUMN-NAME-DELIMITER)))))
+  (last (tokenize-column-name column-family-colon-column-name)))
 
 (defn read-as-hash [hbase-table-name row-id]
-  (let [row (read-row hbase-table-name row-id)]
-    (hbase-object-as-hash row)))
+  (hbase-object-as-hash (read-row hbase-table-name row-id)))
 
 (defn read-as-hydrated [hbase-table-name row-id]
-  (let [as-hash (read-as-hash hbase-table-name row-id)]
-    (hydrate as-hash)))	
+  (hydrate (read-as-hash hbase-table-name row-id)))	
 
 (defn row-exists? [hbase-table-name row-id-string]
   (let [#^HTable table (hbase-table hbase-table-name)]
@@ -369,12 +363,11 @@
         table-descriptor (.getTableDescriptor table)]
     (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
 
-(defn column-names-as-strings [ result-row]
+(defn column-names-as-strings [result-row]
   (map #(String. %) (.keySet result-row)))
 
 (defmemoized hbase-config []
-  (let [h-config (HBaseConfiguration.)]
-    h-config))
+  (HBaseConfiguration.))
 
 (defn hbase-admin []
   (HBaseAdmin. (hbase-config)))
@@ -391,9 +384,10 @@
 (defn add-hbase-columns [table-name column-family-names versions]
   (if-not (empty? column-family-names)
 	  (let [admin (hbase-admin)
-          col-desc (fn [col-name] (let [desc (HColumnDescriptor. col-name)]
-                                    (.setMaxVersions desc versions)
-                                    desc))]
+                col-desc (fn [col-name] 
+                           (let [desc (HColumnDescriptor. col-name)]
+                             (.setMaxVersions desc versions)
+                             desc))]
 	    (.disableTable admin (.getBytes table-name))
 	    (doall (map #(.addColumn admin table-name (col-desc %)) column-family-names))
 	    (.enableTable admin (.getBytes table-name)))))
