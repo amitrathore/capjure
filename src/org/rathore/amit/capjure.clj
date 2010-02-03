@@ -391,7 +391,7 @@
 (defmemoized hbase-config []
   (HBaseConfiguration.))
 
-(defmemoized hbase-admin []
+(defn hbase-admin []
   (HBaseAdmin. (hbase-config)))
 
 (defn create-hbase-table [#^String table-name max-versions & column-families]
