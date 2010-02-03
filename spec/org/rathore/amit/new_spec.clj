@@ -104,8 +104,88 @@
     (is (= (:insert_type (second inserts)) "viewed_aggregate"))
     (is (= (:merchant_product_id (second inserts)) "EZ-30DC-HD"))))
 
+(defn timestamps-for-family-qualifier [family qualifier versions-hash]
+  (keys (get-in versions-hash [family qualifier])))
+
+(defn delete-all-versions-for
+  ([table-name row-id family]
+     (delete-all-versions-for table-name row-id family nil))
+  ([table-name row-id family qualifier]
+     (let [versions-hash (read-all-versions table-name row-id 10000)
+           qualifiers (if qualifier
+                        [qualifier]
+                        (keys (get-in versions-hash [family])))
+           delete-timestamps-for (fn [qual]
+                                   (let [timestamps (timestamps-for-family-qualifier family qual versions-hash)]
+                                     (dorun (map #(delete-row-col-at table-name row-id family qual %) timestamps))))]
+       (dorun (map delete-timestamps-for qualifiers))
+)))
+
+(deftest delete-all-test
+  "row-id must be something unique, otherwise you will get problems with timestamp deletions overlapping with other tests"
+  (let [table-name "capjure_test"
+        row-id "capjure_test_row_id_x"
+        qualifier "delete_all_test"]
+    (testing "does a normal delete"
+      (testing "starting empty"
+       (delete-all table-name row-id)
+       (is (= 0 (count (get-in (read-all-versions table-name row-id 10000) ["meta" (str qualifier "__")]))) "was not initially empty!"))      
+      
+      (testing "create and delete a rec"
+        (capjure-insert {qualifier "val1"} table-name row-id)
+        (is (= 1 (count (get-in (read-all-versions table-name row-id 10000) ["meta" (str qualifier "__")]))) "was not able to insert a record!")
+        (println "all-versions:" (read-all-versions table-name row-id 10000))
+        (delete-all table-name row-id)
+        (is (= 0 (count (get-in (read-all-versions table-name row-id 10000) ["meta" (str qualifier "__")]))) "didn't delete all recs!"))
+
+      (testing "create and delete two recs"
+        (capjure-insert {"test" "val1"} table-name row-id)
+        (capjure-insert {"test" "val2"} table-name row-id)
+        (is (= 2 (count (get-in (read-all-versions table-name row-id 10000) ["meta" "test__"]))))
+        (delete-all table-name row-id)
+        (is (= 0 (count (get-in (read-all-versions table-name row-id 10000) ["meta" "test__"])))))
+      )))
+
+(deftest delete-row-col-at-test
+  (let [table-name "capjure_test"
+        row-id "capjure_test_row_id"]
+    (try
+     (testing "does delete with specific timestamp"
+       (testing "is initially empty"
+         (delete-all-versions-for table-name row-id "meta" "test__")
+         (delete-all-versions-for table-name "other_row_id" "meta" "other__")
+         (is (nil? (get-in (read-all-versions table-name row-id 10000) ["meta" "test__"])) "first col shouldn't exist!")
+         (is (nil? (get-in (read-all-versions table-name "other_row_id" 10000) ["meta" "other__"])) "other test col shouldn't exist!")
+         )
+
+       (let [ts1 (System/currentTimeMillis)
+             ts2 (inc ts1)]
+
+         (testing "three recs addeed"
+           (capjure-insert {"other" "other-val"} table-name "other_row_id" ts1)
+           (is (= 1 (count (get-in (read-all-versions table-name "other_row_id" 10000) ["meta" "other__"]))))
+           (capjure-insert {"test" "val1"} table-name row-id ts1)
+           (capjure-insert {"test" "val2"} table-name row-id ts2)
+           (is (= 2 (count (get-in (read-all-versions table-name row-id 10000) ["meta" "test__"]))))
+           )
+        
+         (testing "only first one is deleted"
+           (delete-row-col-at table-name row-id "meta" "test__" ts1)
+           (let [versions-hash (get-in (read-all-versions table-name row-id 10000) ["meta" "test__"])]
+             (is (= 1 (count versions-hash)))
+             (is (= "val2" (first (vals versions-hash)))))
+           (testing "other rec is left alone"
+             (is (= 1 (count (get-in (read-all-versions table-name "other_row_id" 10000) ["meta" "other__"]))))))
+         ))
+     (finally
+      (delete-all-versions-for table-name row-id "meta" "test__")
+      (delete-all-versions-for table-name "other_row_id" "meta" "other__")
+)
+     )
+    ))
+
 (deftest test-single-column-based-persistence
-  (delete-all "capjure_test" "capjure_test_row_id")
+  (delete-all-versions-for "capjure_test" "capjure_test_row_id" "meta")
   (is (.isEmpty (read-row "capjure_test" "capjure_test_row_id")))
   (capjure-insert consumer-event "capjure_test" "capjure_test_row_id")
   (let [from-db (read-as-hydrated "capjure_test" "capjure_test_row_id")]
@@ -117,11 +197,23 @@
     (assert-equal-in-hashes (second (:inserts consumer-event)) (second (:inserts from-db)) [:html_id])    
     (assert-equal-in-hashes (second (:inserts consumer-event)) (second (:inserts from-db)) [:insert_type])))
 
+(deftest capjure-insert-with-timestamps-test
+  (let [table-name "capjure_test"
+        row-id "capjure_test_row_id"
+        ts1 (System/currentTimeMillis)]
+    (testing "can insert with a custom timestamp"
+      (delete-all-versions-for table-name row-id "meta")
+      (is (.isEmpty (read-row table-name row-id)))
+      (capjure-insert consumer-event table-name row-id ts1)
+      (is (= "14" (get-in (read-all-versions table-name row-id 10000) ["meta" "merchant__id" ts1])))
+      )
+    ))
+  
 (def encoders (config-keys
-  (config-for :inserts 
-              :merchant_product_id
-              (fn [i-map]
-                (str (i-map :merchant_product_id) "@" (i-map :insert_type))))))
+               (config-for :inserts 
+                           :merchant_product_id
+                           (fn [i-map]
+                             (str (i-map :merchant_product_id) "@" (i-map :insert_type))))))
 
 (def decoders (config-keys
   (config-for :inserts 

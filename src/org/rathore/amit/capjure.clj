@@ -2,7 +2,7 @@
   (:use org.rathore.amit.capjure-utils)
   (:import (java.util Set)
 	(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	(org.apache.hadoop.hbase.client Put Get HBaseAdmin HTable Scan Scanner)
+	(org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan Scanner)
 	(org.apache.hadoop.hbase.io BatchUpdate Cell)
 	(org.apache.hadoop.hbase.util Bytes)
 	(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface)))
@@ -49,17 +49,28 @@
 
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 
-(defn capjure-insert [object-to-save hbase-table-name row-id]
-  (let [#^HTable table (hbase-table hbase-table-name)
-        put (Put. (Bytes/toBytes row-id))
-        flattened (flatten object-to-save)]
-    (add-to-insert-batch put flattened)
-    (.put table put)))
+(defn add-timestamp-if-exists [put timestamp]
+  (if timestamp
+    (.setTimeStamp put timestamp)
+    put))
 
-(defn add-to-insert-batch [put flattened-list]
+(defn capjure-insert
+  ([object-to-save hbase-table-name row-id]
+     (capjure-insert object-to-save hbase-table-name row-id nil))
+  ([object-to-save hbase-table-name row-id version-timestamp]
+     (let [#^HTable table (hbase-table hbase-table-name)
+           put (Put. (Bytes/toBytes row-id))
+           flattened (flatten object-to-save)]
+       (if version-timestamp
+         (.setTimeStamp put version-timestamp))
+       (add-to-insert-batch put flattened version-timestamp)
+       (.put table put))))
+
+(defn add-to-insert-batch [put flattened-list version-timestamp]
   (doseq [[column value] flattened-list]
     (let [[family qualifier] (.split column ":")]
-      (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (Bytes/toBytes value)))))
+      (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (Bytes/toBytes (str value)))
+      )))
 
 (defmemoized symbol-name [prefix]
   (if (keyword? prefix) 
@@ -357,6 +368,17 @@
   (let [table (hbase-table hbase-table-name)]
     (doseq [row-id row-ids-as-strings]
       (.deleteAll table row-id))))
+
+(defn delete-row-col-at [hbase-table-name row-id family qualifier timestamp]
+  (let [table (hbase-table hbase-table-name)
+        delete (Delete. (.getBytes row-id))]
+    (if timestamp
+      (.deleteColumn delete (.getBytes family) (.getBytes qualifier) timestamp)
+      (.deleteColumn delete (.getBytes family) (.getBytes qualifier)))
+    (.delete table delete)))
+
+(defn delete-row-col-latest [hbase-table-name row-id family qualifier]
+  (delete-row-col-at hbase-table-name row-id family qualifier nil))
 
 (defmemoized column-families-for [hbase-table-name]
   (let [table (hbase-table hbase-table-name)
