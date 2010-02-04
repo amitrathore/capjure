@@ -49,11 +49,6 @@
 
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 
-(defn add-timestamp-if-exists [put timestamp]
-  (if timestamp
-    (.setTimeStamp put timestamp)
-    put))
-
 (defn create-put [row-id version-timestamp]
   (let [put (Put. (Bytes/toBytes row-id))]
     (if version-timestamp
