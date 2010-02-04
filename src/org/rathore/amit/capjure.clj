@@ -54,19 +54,27 @@
     (.setTimeStamp put timestamp)
     put))
 
+(defn create-put [row-id version-timestamp]
+  (let [put (Put. (Bytes/toBytes row-id))]
+    (if version-timestamp
+      (.setTimeStamp put version-timestamp))
+    put))
+
+(defn insert-with-put [object-to-save hbase-table-name put]
+  (let [#^HTable table (hbase-table hbase-table-name)
+        flattened (flatten object-to-save)]
+    (add-to-insert-batch put flattened)
+    (.put table put)))
+
 (defn capjure-insert
   ([object-to-save hbase-table-name row-id]
-     (capjure-insert object-to-save hbase-table-name row-id nil))
+     (let [put (create-put row-id nil)]
+       (insert-with-put object-to-save hbase-table-name put)))
   ([object-to-save hbase-table-name row-id version-timestamp]
-     (let [#^HTable table (hbase-table hbase-table-name)
-           put (Put. (Bytes/toBytes row-id))
-           flattened (flatten object-to-save)]
-       (if version-timestamp
-         (.setTimeStamp put version-timestamp))
-       (add-to-insert-batch put flattened version-timestamp)
-       (.put table put))))
+     (let [put (create-put row-id version-timestamp)]
+       (insert-with-put object-to-save hbase-table-name put))))
 
-(defn add-to-insert-batch [put flattened-list version-timestamp]
+(defn add-to-insert-batch [put flattened-list]
   (doseq [[column value] flattened-list]
     (let [[family qualifier] (.split column ":")]
       (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (Bytes/toBytes (str value)))
