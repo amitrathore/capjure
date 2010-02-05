@@ -17,14 +17,6 @@ if [ ! -f /etc/clojure.conf -a ! -f ~/.clojure.conf ]; then
     exit
 fi
 
-
-# Whether to load the repl or script
-if [ -z "$1" ]; then
-	clj_class=clojure.lang.Repl
-else
-	clj_class=clojure.lang.Script
-fi
-
 CAPJURE_HOME="."
 capjure_jars="${CAPJURE_HOME}/lib/java/"
 capjure_clj="${CAPJURE_HOME}/spec/"
@@ -40,4 +32,6 @@ if [ -n "${clj_lib}" ]; then
     export LD_LIBRARY_PATH=${clj_lib}:$LD_LIBRARY_PATH
 fi
 
-exec java -Dpid=$$ ${clj_opts} -cp ${clj_cp}:${clj} ${clj_wrapper} ${clj_class} ${clj_rc} $*
+# 
+echo "Use the clj_ext env var to add jars to the classpath."
+exec java -Dpid=$$ ${clj_opts} -cp ${clj_cp}:${clj} ${clj_wrapper} clojure.main ${clj_rc} $*

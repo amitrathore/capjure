@@ -47,16 +47,21 @@
     (is (= (flattened "two:d") 4))))
 
 (deftest test-flatten-value-configured
-  (let [to-process {:inserts [{:merchant_product_id "kel-10-ab" :merchant_price "11.00" :cinch_price "9.95"}
-			      {:merchant_product_id "sut-91-xy" :merchant_price "8.00" :cinch_price "6.55"}]}
+  (let [to-process {:inserts [{:merchant_product_id "kel-10-ab" :merchant_price "11.00" :cinch_price "9.95" :insert_type "typeA"}
+			      {:merchant_product_id "sut-91-xy" :merchant_price "8.00" :cinch_price "6.55" :insert_type "typeB"}]}
 	processed (flatten to-process)]
     (println processed)
-    (is (= (count (keys processed)) 4))
-    (is-same-sequence (keys processed) '("inserts_merchant_price:kel-10-ab" "inserts_cinch_price:kel-10-ab" "inserts_merchant_price:sut-91-xy" "inserts_cinch_price:sut-91-xy"))
-    (is (= (processed "inserts_merchant_price:kel-10-ab") "11.00"))
-    (is (= (processed "inserts_merchant_price:sut-91-xy") "8.00"))
-    (is (= (processed "inserts_cinch_price:kel-10-ab") "9.95"))
-    (is (= (processed "inserts_cinch_price:sut-91-xy") "6.55"))))
+    (is (= (count (keys processed)) 6))
+    (is-same-sequence (keys processed) '("inserts_merchant_price:kel-10-ab@typeA"
+                                         "inserts_cinch_price:kel-10-ab@typeA"
+                                         "inserts_insert_type:kel-10-ab@typeA"
+                                         "inserts_insert_type:sut-91-xy@typeB"
+                                         "inserts_merchant_price:sut-91-xy@typeB"
+                                         "inserts_cinch_price:sut-91-xy@typeB"))
+    (is (= (processed "inserts_merchant_price:kel-10-ab@typeA") "11.00"))
+    (is (= (processed "inserts_merchant_price:sut-91-xy@typeB") "8.00"))
+    (is (= (processed "inserts_cinch_price:kel-10-ab@typeA") "9.95"))
+    (is (= (processed "inserts_cinch_price:sut-91-xy@typeB") "6.55"))))
 
 (deftest test-flatten-array-of-strings
   (let [to-flatten {:active_campaigns [3 4 7 10 11 13]}
@@ -78,19 +83,19 @@
 (deftest test-hydrate
   (let [flattened (flatten hash-object)
 	hydrated (hydrate flattened)
-	consumer (hydrated "consumer")
-	merchant (hydrated "merchant")
-	inserts (hydrated "inserts")
+	consumer (hydrated :consumer)
+	merchant (hydrated :merchant)
+	inserts (hydrated :inserts)
 	insert (first inserts)]
-    (is-same-sequence (hydrated "active_campaigns") [3 4 7 10 11 13])
-    (is (= (hydrated "api") "0.0.1.0"))
+    (is-same-sequence (hydrated :active_campaigns) [3 4 7 10 11 13])
+    (is (= (hydrated :api) "0.0.1.0"))
     (is (= (count inserts) 1))
-    (is (= (insert "campaign_id") "-1"))
-    (is (= (insert "merchant_product_id") "SS-REG"))
-    (is (= (insert "cinch_unit_price") "36.95"))
-    (is (= (consumer "kind") "visitor"))
-    (is (= (consumer "id") "103"))
-    (is (= (merchant "name") "portable chairs"))))
+    (is (= (insert :campaign_id) "-1"))
+    (is (= (insert :merchant_product_id) "SS-REG"))
+    (is (= (insert :cinch_unit_price) "36.95"))
+    (is (= (consumer :kind) "visitor"))
+    (is (= (consumer :id) "103"))
+    (is (= (merchant :name) "portable chairs"))))
 
 (def cart-string 
      "{\"event_type\": \"cart\", \"api\": \"0.0.1.0\", \"session\": {\"cinch_session_id\": \"1948c2cef48e58a6c1f215a545512077\", \"merchant_session_id\": \"b768e9911893b91b279e08ac8efde20f\", \"uber_session_id\": \"ee2bcc43-dae9-e0f0-40e8-325f96b5f114\"}, \"cart_items\": [{\"campaign_id\": -1, \"merchant_product_id\": \"EZ-30DC-HD\", \"merchant_unit_price\": 109.95, \"options\": null, \"name\": null, \"cinch_unit_price\": 109.95, \"sku\": \"EZ-30DC-HD (Yellow) XX\", \"quantity\": 1, \"description\": null}, {\"campaign_id\": -1, \"merchant_product_id\": \"OB-BW-LNGR\", \"merchant_unit_price\": 229.95, \"options\": null, \"name\": null, \"cinch_unit_price\": 229.95, \"sku\": \"OB-BW-LNGR (RED) LL\", \"quantity\": 1, \"description\": null}], \"page\": {\"merchant_template_name\": \"index\", \"referrer\": \"http://chairs.vasanta.hq.cinchcorp.com/shopping_cart.html?number_of_uploads=0\", \"request_url\": \"http://chairs.vasanta.hq.cinchcorp.com/hanging-chairs-c-23.html\"}, \"cart\": {\"checkout_state\": 1}, \"merchant\": {\"name\": \"Portable Folding Chairs\", \"id\": 14}, \"http_client\": {\"browser_version\": \"3\", \"operating_system\": \"Macintosh\", \"operating_system_version\": \"OS X\", \"ip_address\": \"192.168.10.10\", \"browser\": \"Safari\"}, \"active_campaigns\": [3, 4, 7, 10, 11, 13], \"consumer\": {\"email_address\": \"afd4cb68-bb3b-e51f-ac2a-cb6eefce528f@visitor.cinchcorp.com\", \"kind\": \"visitor\", \"id\": 103}}")
@@ -98,11 +103,11 @@
 
 (deftest test-flatten-with-sku 
   (let [flattened (flatten cart-object)
-	hydrated (hydrate flattened)
-	cart-items (hydrated "cart_items")
-	cart-item (first cart-items)]
+        hydrated (hydrate flattened)
+        cart-items (hydrated :cart_items)
+        cart-item (first cart-items)]
     (is (= (count cart-items) 2))
-    (is (= (cart-item "sku") "OB-BW-LNGR (RED) LL"))
-    (is (= (cart-item "merchant_product_id") "OB-BW-LNGR"))))
+    (is (= (cart-item :sku) "OB-BW-LNGR (RED) LL"))
+    (is (= (cart-item :merchant_product_id) "OB-BW-LNGR"))))
 	     
 
