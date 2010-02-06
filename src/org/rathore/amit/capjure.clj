@@ -383,6 +383,24 @@
 (defn delete-row-col-latest [hbase-table-name row-id family qualifier]
   (delete-row-col-at hbase-table-name row-id family qualifier nil))
 
+(defn delete-all-versions-for [table-name row-id]
+  (let [all-versions (read-all-versions table-name row-id 10000)
+        families (keys all-versions)
+        del-column (fn [family qualifier]
+                     (let [num-timestamps (count (get-in all-versions [family qualifier]))]
+                       (dotimes [n num-timestamps]
+                         (delete-row-col-latest table-name row-id family qualifier))))
+        del-family (fn [family]
+                     (let [qualifiers (keys (get-in all-versions [family]))]
+                       (dorun (map #(del-column family %) qualifiers))))]
+    (dorun (map del-family families))
+    )
+  )
+
+(defn delete-all-rows-versions [table-name row-ids]
+  (dorun
+   (map #(delete-all-versions-for table-name %) row-ids)))
+
 (defmemoized column-families-for [hbase-table-name]
   (let [table (hbase-table hbase-table-name)
         table-descriptor (.getTableDescriptor table)]
