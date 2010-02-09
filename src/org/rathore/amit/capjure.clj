@@ -1,11 +1,11 @@
 (ns org.rathore.amit.capjure
   (:use org.rathore.amit.capjure-utils)
   (:import (java.util Set)
-	(org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
-	(org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan Scanner)
-	(org.apache.hadoop.hbase.io BatchUpdate Cell)
-	(org.apache.hadoop.hbase.util Bytes)
-	(org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface)))
+           (org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
+           (org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan Scanner)
+           (org.apache.hadoop.hbase.io BatchUpdate Cell)
+           (org.apache.hadoop.hbase.util Bytes)
+           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface)))
 
 (def *hbase-master*)
 (def *single-column-family?*) 
@@ -146,7 +146,7 @@
     
 (declare read-as-hash cell-value-as-string hydrate-pair has-many-strings-hydration has-many-objects-hydration has-one-string-hydration has-one-object-hydration collapse-for-hydration)
 
-(defmemoized is-from-primary-keys [key-name]
+(defmemoized is-from-primary-keys? [key-name]
   (let [key-name-str (symbol-name key-name)]
     (some #(.startsWith key-name-str %) (all-primary-keys))))
 
@@ -170,7 +170,8 @@
                  inner-map (ret primary-key)
                  inner-values (apply vector (vals inner-map))]
               (assoc ret primary-key inner-values)))
-          mostly-hydrated (all-primary-keys)))
+          mostly-hydrated (filter is-from-primary-keys? (keys mostly-hydrated))
+          ))
 
 (defn hydrate [flattened-and-prepended]
   (let [flattened-object (strip-prefixes flattened-and-prepended)
@@ -187,7 +188,7 @@
         [#^String column-family #^String column-name] (tokenize-column-name key-name)]
     (cond
       (= column-name value) (has-many-strings-hydration hydrated column-family value)
-      (is-from-primary-keys column-family) (has-many-objects-hydration hydrated column-family column-name value)
+      (is-from-primary-keys? column-family) (has-many-objects-hydration hydrated column-family column-name value)
       (column-name-empty? key-name) (has-one-string-hydration hydrated column-family value)
       :else (has-one-object-hydration hydrated column-family column-name value))))
 
@@ -367,11 +368,6 @@
 (defn rowcount [#^String hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
 
-(defn delete-all [#^String hbase-table-name & row-ids-as-strings]
-  (let [table (hbase-table hbase-table-name)]
-    (doseq [row-id row-ids-as-strings]
-      (.deleteAll table row-id))))
-
 (defn delete-row-col-at [hbase-table-name row-id family qualifier timestamp]
   (let [table (hbase-table hbase-table-name)
         delete (Delete. (.getBytes row-id))]
@@ -387,19 +383,31 @@
   (let [all-versions (read-all-versions table-name row-id 10000)
         families (keys all-versions)
         del-column (fn [family qualifier]
-                     (let [num-timestamps (count (get-in all-versions [family qualifier]))]
+                     (let [timestamps (keys (get-in all-versions [family qualifier]))
+                           num-timestamps (count timestamps)]
                        (dotimes [n num-timestamps]
-                         (delete-row-col-latest table-name row-id family qualifier))))
+                         (delete-row-col-latest table-name row-id family qualifier)
+                         )))
         del-family (fn [family]
-                     (let [qualifiers (keys (get-in all-versions [family]))]
+                     (let [qualifiers (keys (all-versions family))]
                        (dorun (map #(del-column family %) qualifiers))))]
-    (dorun (map del-family families))
+    (if all-versions
+      (do
+        (dorun (map del-family families))
+        ;; Versions could be higher than max-versions, but we don't
+        ;; know that from all-versions (unfortunately)... hence the
+        ;; recur step.
+        (recur table-name row-id))
+      )
     )
   )
 
 (defn delete-all-rows-versions [table-name row-ids]
   (dorun
    (map #(delete-all-versions-for table-name %) row-ids)))
+
+(defn delete-all [#^String hbase-table-name & row-ids-as-strings]
+  (delete-all-rows-versions hbase-table-name row-ids-as-strings))
 
 (defmemoized column-families-for [hbase-table-name]
   (let [table (hbase-table hbase-table-name)

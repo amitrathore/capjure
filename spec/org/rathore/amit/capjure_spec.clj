@@ -15,7 +15,7 @@
 
 (deftest test-prepend-to-keys
   (let [to-prepend (hash-object :consumer)
-	prepended (prepend-to-keys "con" ":" to-prepend)]
+        prepended (prepend-to-keys "con" ":" to-prepend)]
     (is-same-sequence (keys prepended) (list "con:kind" "con:id" "con:email_address"))
     (is (= (count (vals prepended)) (count (vals to-prepend))))
     (is (= (prepended "con:id") (to-prepend :id)))
@@ -24,7 +24,7 @@
 
 (deftest test-postpend-to-keys
   (let [to-postpend (hash-object :consumer)
-	postpended (postpend-to-keys "abc" ":" to-postpend)]
+        postpended (postpend-to-keys "abc" ":" to-postpend)]
     (is-same-sequence (keys postpended) (list "kind:abc" "id:abc" "email_address:abc"))
     (is (= (count (vals postpended)) (count (vals to-postpend))))
     (is (= (postpended "id:abc") (to-postpend :id)))
@@ -33,13 +33,13 @@
 
 (deftest test-process-key-value-simple
   (let [to-process {:consumer {:kind "visitor" :id "110" :email_address "amitrathore@gmail.com"}}
-	processed (process-key-value :consumer (to-process :consumer))]
+        processed (process-key-value :consumer (to-process :consumer))]
     (is (= (count (keys processed)) 3))
     (is-same-sequence (keys processed) '("consumer:kind" "consumer:id" "consumer:email_address"))))
 
 (deftest test-flatten-simple
   (let [to-flatten {:one {:a 1 :b 2} :two {:c 3 :d 4}}
-	flattened (flatten to-flatten)]
+        flattened (flatten to-flatten)]
     (is (= (count (keys flattened)) 4))
     (is (= (flattened "one:a") 1))
     (is (= (flattened "one:b") 2))
@@ -48,9 +48,8 @@
 
 (deftest test-flatten-value-configured
   (let [to-process {:inserts [{:merchant_product_id "kel-10-ab" :merchant_price "11.00" :cinch_price "9.95" :insert_type "typeA"}
-			      {:merchant_product_id "sut-91-xy" :merchant_price "8.00" :cinch_price "6.55" :insert_type "typeB"}]}
-	processed (flatten to-process)]
-    (println processed)
+                              {:merchant_product_id "sut-91-xy" :merchant_price "8.00" :cinch_price "6.55" :insert_type "typeB"}]}
+        processed (flatten to-process)]
     (is (= (count (keys processed)) 6))
     (is-same-sequence (keys processed) '("inserts_merchant_price:kel-10-ab@typeA"
                                          "inserts_cinch_price:kel-10-ab@typeA"
@@ -65,7 +64,7 @@
 
 (deftest test-flatten-array-of-strings
   (let [to-flatten {:active_campaigns [3 4 7 10 11 13]}
-	flattened (flatten to-flatten)]
+        flattened (flatten to-flatten)]
     (is (= (count (keys flattened)) 6))
     (is (= (flattened "active_campaigns:3") 3))
     (is (= (flattened "active_campaigns:4") 4))
@@ -76,17 +75,17 @@
 
 (deftest test-flatten-large-object
   (let [flattened (flatten hash-object)
-	all-keys (keys flattened)]
+        all-keys (keys flattened)]
     (is (= (count all-keys) 20))
     (is (= (flattened "api:") "0.0.1.0"))))
 
 (deftest test-hydrate
   (let [flattened (flatten hash-object)
-	hydrated (hydrate flattened)
-	consumer (hydrated :consumer)
-	merchant (hydrated :merchant)
-	inserts (hydrated :inserts)
-	insert (first inserts)]
+        hydrated (hydrate flattened)
+        consumer (hydrated :consumer)
+        merchant (hydrated :merchant)
+        inserts (hydrated :inserts)
+        insert (first inserts)]
     (is-same-sequence (hydrated :active_campaigns) [3 4 7 10 11 13])
     (is (= (hydrated :api) "0.0.1.0"))
     (is (= (count inserts) 1))
