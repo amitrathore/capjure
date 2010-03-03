@@ -294,6 +294,12 @@
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id-string) (RegExpRowFilter. row-id-regex))]
     (iterator-seq (.iterator scanner))))
 
+(defn remove-single-column-family [all-versions-map]
+  (let [smaller-map (fn [[row-id v]]
+                      {row-id (v *hbase-single-column-family*)})]
+    (doall
+     (apply merge (map smaller-map all-versions-map)))))
+
 (defn collect-by-split-key [compound-keys-map]
   (reduce (fn [bucket [compound-key vals-map]]
             (let [split-keys (seq (.split compound-key (COLUMN-NAME-DELIMITER)))
@@ -495,9 +501,3 @@
 (defmacro with-scanner [[scanner] & exprs]
   `(do ~@exprs
        (.close ~scanner)))
-
-(defn remove-single-column-family [all-versions-map]
-  (let [smaller-map (fn [[row-id v]]
-                      {row-id (v *hbase-single-column-family*)})]
-    (doall
-     (apply merge (map smaller-map all-versions-map)))))
