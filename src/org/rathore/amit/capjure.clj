@@ -12,7 +12,7 @@
 (def *hbase-single-column-family*)
 (def *primary-keys-config*)
 
-(defn COLUMN-NAME-DELIMITER []
+(defn COLUMN-NAME-DELIMITER0 []
   (if *single-column-family?* "__" ":"))
 
 (defn single-column-prefix []
@@ -294,6 +294,20 @@
   (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id-string) (RegExpRowFilter. row-id-regex))]
     (iterator-seq (.iterator scanner))))
 
+(defn collect-by-split-key [compound-keys-map]
+  (reduce (fn [bucket [compound-key vals-map]]
+            (let [split-keys (seq (.split compound-key (COLUMN-NAME-DELIMITER)))
+                  key1 (first split-keys)
+                  key2 (second split-keys)]
+              (assoc-in bucket [key1 key2] vals-map))) {} compound-keys-map))
+
+(defn collect-compound-keys-by-row [bucket [row-id vals-map]]
+  (assoc bucket row-id (collect-by-split-key vals-map)))
+
+(defn expand-single-col-versions [all-versions-map]
+  (let [smaller-map (remove-single-column-family all-versions-map)]
+    (reduce collect-compound-keys-by-row {} smaller-map)))
+
 (defn read-all-versions 
   ([hbase-table-name row-id-string number-of-versions]
      (let [#^HTable table (hbase-table hbase-table-name)]
@@ -302,10 +316,17 @@
      (let [#^HTable table (hbase-table hbase-table-name)]
        (stringify-nav-map (.getMap (.get table (create-get row-id-string [column-family-as-string] number-of-versions)))))))
 
-(defn read-all-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
+(defn read-all-multi-col-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
   (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
         row-ids (map row-id-of-row rows-between)]
     (apply merge (map (fn [row-id] {row-id (read-all-versions hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
+
+(defn read-all-versions-between
+  ([hbase-table-name column-family-as-string start-row-id end-row-id]
+     (read-all-multi-col-versions-between hbase-table-name column-family-as-string start-row-id end-row-id))
+  ([hbase-table-name start-row-id end-row-id]
+     (expand-single-col-versions
+      (read-all-versions-between hbase-table-name *hbase-single-column-family* start-row-id end-row-id))))
 
 (defn read-cell [hbase-table-name row-id column-name]
   (let [row (read-row hbase-table-name row-id)]
@@ -473,4 +494,10 @@
 
 (defmacro with-scanner [[scanner] & exprs]
   `(do ~@exprs
-     (.close ~scanner)))
+       (.close ~scanner)))
+
+(defn remove-single-column-family [all-versions-map]
+  (let [smaller-map (fn [[row-id v]]
+                      {row-id (v *hbase-single-column-family*)})]
+    (doall
+     (apply merge (map smaller-map all-versions-map)))))
