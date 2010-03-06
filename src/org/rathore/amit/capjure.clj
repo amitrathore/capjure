@@ -12,7 +12,7 @@
 (def *hbase-single-column-family*)
 (def *primary-keys-config*)
 
-(defn COLUMN-NAME-DELIMITER0 []
+(defn COLUMN-NAME-DELIMITER []
   (if *single-column-family?* "__" ":"))
 
 (defn single-column-prefix []
