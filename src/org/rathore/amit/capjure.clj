@@ -69,10 +69,13 @@
      (let [put (create-put row-id version-timestamp)]
        (insert-with-put object-to-save hbase-table-name put))))
 
+(defn to-bytes [value]
+  (Bytes/toBytes (str (or value ""))))
+
 (defn add-to-insert-batch [put flattened-list]
   (doseq [[column value] flattened-list]
     (let [[family qualifier] (.split column ":")]
-      (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (Bytes/toBytes (str value)))
+      (.add put (Bytes/toBytes family) (Bytes/toBytes (or  qualifier "")) (to-bytes value))
       )))
 
 (defmemoized symbol-name [prefix]
