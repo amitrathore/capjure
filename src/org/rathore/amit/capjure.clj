@@ -277,13 +277,11 @@
   (map #(get-result-for hbase-table-name %) row-id-list))
 
 (declare table-scanner)
-(defn read-rows-between [hbase-table-name columns start-row-id-string end-row-id-string]
+(defn read-rows-between
+  "Returns rows from start to end IDs provided.  Does NOT include stop-row-id.
+   Use InclusiveStopRow Filter if you'd like to include the stop row."
+  [hbase-table-name columns start-row-id-string end-row-id-string]
   (let [#^Scanner scanner (table-scanner hbase-table-name columns start-row-id-string end-row-id-string)]
-    (iterator-seq (.iterator scanner))))
-
-(defn read-rows-up-to [hbase-table-name columns start-row-id end-row-id]
-  ;; NOTE: not inclusive of the end row
-  (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id) (StopRowFilter. (.getBytes end-row-id)))]
     (iterator-seq (.iterator scanner))))
 
 (defn row-id-of-row [hbase-row]
@@ -292,10 +290,6 @@
 (defn first-row-id [hbase-table-name column-name]
   (let [#^Scanner first-row-scanner (table-scanner hbase-table-name [column-name])]
     (row-id-of-row (first (iterator-seq (.iterator first-row-scanner))))))
-
-(defn read-rows-like [hbase-table-name columns start-row-id-string row-id-regex]
-  (let [#^Scanner scanner (table-scanner hbase-table-name columns (.getBytes start-row-id-string) (RegExpRowFilter. row-id-regex))]
-    (iterator-seq (.iterator scanner))))
 
 (defn remove-single-column-family [all-versions-map]
   (let [smaller-map (fn [[row-id v]]
@@ -378,11 +372,6 @@
   ([#^String hbase-table-name columns #^String start-row-string #^String end-row-string]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-start-to-end columns (.getBytes start-row-string) (.getBytes end-row-string))))))
-
-(defn table-scanner-with-filter [#^String hbase-table-name columns #^String start-row-string filter-object]
-  (let [table (hbase-table hbase-table-name)]
-    (.getScanner table (scan-for-start-and-filter columns (.getBytes start-row-string) filter-object))))
-
 (defn hbase-row-seq [scanner]
   (let [first-row (.next scanner)]
     (if-not first-row
@@ -443,6 +432,12 @@
   (let [table (hbase-table hbase-table-name)
         table-descriptor (.getTableDescriptor table)]
     (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
+
+(defn simple-delete-row [hbase-table-name row-id]
+  (let [table (hbase-table hbase-table-name)
+        delete (Delete. (.getBytes row-id))]
+    (.delete table delete)
+    ))
 
 (defn column-names-as-strings [result-row]
   (map #(String. %) (.keySet result-row)))
