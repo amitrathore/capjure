@@ -335,8 +335,11 @@
   (let [row (read-row hbase-table-name row-id)]
     (cell-value-as-string row column-name)))
 
-(defn table-iterator [#^String hbase-table-name columns]
-    (iterator-seq (.iterator (table-scanner hbase-table-name columns))))
+(defn table-iterator
+  ([#^String hbase-table-name columns]
+     (iterator-seq (.iterator (table-scanner hbase-table-name columns))))
+  ([#^String hbase-table-name columns start-row-string]
+     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string)))))
 
 (defn add-columns-to-scan [#^Scan scan columns]
   (doseq [#^String col columns]
