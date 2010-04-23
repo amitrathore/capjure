@@ -384,8 +384,10 @@
 
 (defn next-row-id [#^String hbase-table-name column-to-use row-id]
   (let [scanner (table-scanner hbase-table-name [column-to-use] row-id)
-        _ (.next scanner)]
-    (row-id-of-row (.next scanner))))
+        _ (.next scanner)
+        next-result (.next scanner)]
+    (if next-result
+      (row-id-of-row next-result))))
 
 (defn rowcount [#^String hbase-table-name & columns]
   (count (table-iterator hbase-table-name columns)))
