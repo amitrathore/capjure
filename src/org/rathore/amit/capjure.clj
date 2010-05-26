@@ -339,7 +339,9 @@
   ([#^String hbase-table-name columns]
      (iterator-seq (.iterator (table-scanner hbase-table-name columns))))
   ([#^String hbase-table-name columns start-row-string]
-     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string)))))
+     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string))))
+  ([#^String hbase-table-name columns start-row-string stop-row-id]
+     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string stop-row-id)))))
 
 (defn add-columns-to-scan [#^Scan scan columns]
   (doseq [#^String col columns]
