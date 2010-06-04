@@ -343,6 +343,38 @@
   ([#^String hbase-table-name columns start-row-string stop-row-id]
      (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string stop-row-id)))))
 
+
+(defn safe-scan-seq [scanner scanner-fn args-map]
+  (let [[next-result next-scanner]
+        (try
+         [(.next scanner) scanner]
+         (catch RuntimeException e
+           (if (caused-by-scanner-timeout? e)
+             (let [restart-row-id (or (args-map :last-good-row-id) (args-map :start-row-id))
+                   new-scanner (scanner-fn (assoc args-map :start-row-id restart-row-id))
+                   _ (.next new-scanner)]
+               [(.next scanner) new-scanner])
+             (throw e))))]
+    (if next-result
+      (lazy-seq
+       (cons next-result
+             (safe-scan-seq next-scanner scanner-fn
+                            (assoc args-map :last-good-row-id
+                                   (row-id-of-row next-result))))))))
+
+(defn wrapped-table-scanner
+  [{:keys [table-name columns start-row-id stop-row-id]}]
+  (let [scanner-fn (partial table-scanner table-name columns)]
+    (cond
+     (and start-row-id stop-row-id) (scanner-fn start-row-id stop-row-id)
+     start-row-id (scanner-fn start-row-id)
+     :else (scanner-fn))))
+
+(defn scan-seq [args-map]
+  (let [scanner (wrapped-table-scanner args-map)]
+    (safe-scan-seq scanner wrapped-table-scanner args-map)))
+
+
 (defn add-columns-to-scan [#^Scan scan columns]
   (doseq [#^String col columns]
     (.addColumn scan (.getBytes col))))
@@ -377,6 +409,7 @@
   ([#^String hbase-table-name columns #^String start-row-string #^String end-row-string]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-start-to-end columns (.getBytes start-row-string) (.getBytes end-row-string))))))
+
 (defn hbase-row-seq [scanner]
   (let [first-row (.next scanner)]
     (if-not first-row
