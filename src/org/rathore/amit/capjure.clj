@@ -276,12 +276,20 @@
 (defn read-rows [hbase-table-name row-id-list]
   (map #(get-result-for hbase-table-name %) row-id-list))
 
-(declare table-scanner)
+(declare table-scanner table-scanner-including-stop)
 (defn read-rows-between
-  "Returns rows from start to end IDs provided.  Does NOT include stop-row-id.
-   Use InclusiveStopRow Filter if you'd like to include the stop row."
-  [hbase-table-name columns start-row-id-string end-row-id-string]
-  (let [#^Scanner scanner (table-scanner hbase-table-name columns start-row-id-string end-row-id-string)]
+  "Returns rows from start to stop IDs provided.  Does NOT include stop row.
+   Use read-rows-including if you'd like to include the stop row."
+  [hbase-table-name columns start-id stop-id]
+  (let [#^Scanner scanner (table-scanner hbase-table-name columns
+                                         start-id stop-id)]
+    (iterator-seq (.iterator scanner))))
+
+(defn read-rows-including
+  "Returns rows from start to stop IDs provided.  Includes stop row."
+  [hbase-table-name columns start-id stop-id]
+  (let [#^Scanner scanner (table-scanner-including-stop hbase-table-name columns
+                                                        start-id stop-id)]
     (iterator-seq (.iterator scanner))))
 
 (defn row-id-of-row [hbase-row]
@@ -319,17 +327,40 @@
      (let [#^HTable table (hbase-table hbase-table-name)]
        (stringify-nav-map (.getMap (.get table (create-get row-id-string [column-family-as-string] number-of-versions)))))))
 
-(defn read-all-multi-col-versions-between [hbase-table-name column-family-as-string start-row-id end-row-id]
-  (let [rows-between (read-rows-between hbase-table-name [column-family-as-string] start-row-id end-row-id)
-        row-ids (map row-id-of-row rows-between)]
-    (apply merge (map (fn [row-id] {row-id (read-all-versions hbase-table-name row-id column-family-as-string 100000)}) row-ids))))
+(defn read-all-multi-col-versions
+  [read-rows-fn hbase-table-name column-family-as-string start-id stop-id]
+  (let [rows (read-rows-fn hbase-table-name [column-family-as-string]
+                           start-id stop-id)
+        row-ids (map row-id-of-row rows)
+        make-row-map (fn [row-id]
+                       {row-id
+                        (read-all-versions hbase-table-name row-id
+                                           column-family-as-string 100000)})]
+    (apply merge (map make-row-map row-ids))))
+
+(defn read-all-multi-col-versions-between
+  [hbase-table-name column-family-as-string start-id stop-id]
+  (read-all-multi-col-versions read-rows-between hbase-table-name
+                               column-family-as-string start-id stop-id))
+
+(defn read-all-multi-col-versions-inclusive
+  [hbase-table-name column-family-as-string start-id stop-id]
+  (read-all-multi-col-versions read-rows-including hbase-table-name
+                               column-family-as-string start-id stop-id))
 
 (defn read-all-versions-between
-  ([hbase-table-name column-family-as-string start-row-id end-row-id]
-     (read-all-multi-col-versions-between hbase-table-name column-family-as-string start-row-id end-row-id))
-  ([hbase-table-name start-row-id end-row-id]
+  ([hbase-table-name column-family-as-string start-id stop-id]
+     (read-all-multi-col-versions-between hbase-table-name column-family-as-string start-id stop-id))
+  ([hbase-table-name start-id stop-id]
      (expand-single-col-versions
-      (read-all-versions-between hbase-table-name *hbase-single-column-family* start-row-id end-row-id))))
+      (read-all-versions-between hbase-table-name *hbase-single-column-family* start-id stop-id))))
+
+(defn read-all-versions-inclusive
+  ([hbase-table-name column-family-as-string start-id stop-id]
+     (read-all-multi-col-versions-inclusive hbase-table-name column-family-as-string start-id stop-id))
+  ([hbase-table-name start-id stop-id]
+     (expand-single-col-versions
+      (read-all-versions-inclusive hbase-table-name *hbase-single-column-family* start-id stop-id))))
 
 (defn read-cell [hbase-table-name row-id column-name]
   (let [row (read-row hbase-table-name row-id)]
@@ -338,10 +369,10 @@
 (defn table-iterator
   ([#^String hbase-table-name columns]
      (iterator-seq (.iterator (table-scanner hbase-table-name columns))))
-  ([#^String hbase-table-name columns start-row-string]
-     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string))))
-  ([#^String hbase-table-name columns start-row-string stop-row-id]
-     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-row-string stop-row-id)))))
+  ([#^String hbase-table-name columns start-id]
+     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-id))))
+  ([#^String hbase-table-name columns start-id stop-id]
+     (iterator-seq (.iterator (table-scanner hbase-table-name columns start-id stop-id)))))
 
 (defn add-columns-to-scan [#^Scan scan columns]
   (doseq [#^String col columns]
@@ -352,31 +383,47 @@
     (add-columns-to-scan scan columns)
     scan))
 
-(defn scan-for-start [columns #^bytes start-row-bytes]
-  (let [scan (Scan. start-row-bytes)]
+(defn scan-for-start [columns #^String start-id]
+  (let [scan (Scan. (.getBytes start-id))]
     (add-columns-to-scan scan columns)
     scan))
 
-(defn scan-for-start-to-end [columns #^bytes start-row-bytes #^bytes end-row-bytes]
-  (let [scan (Scan. start-row-bytes end-row-bytes)]
+(defn scan-for-start-to-stop
+  [columns #^String start-id #^String stop-id]
+  (let [scan (Scan. (.getBytes start-id) (.getBytes stop-id))]
     (add-columns-to-scan scan columns)
     scan))
 
-(defn scan-for-start-and-filter [columns #^bytes start-row-bytes #^Filter filter]
-  (let [scan (Scan. start-row-bytes filter)]
+(defn scan-for-start-and-filter
+  [columns #^String start-row-string #^Filter filter]
+  (let [scan (Scan. (.getBytes start-row-string) filter)]
     (add-columns-to-scan scan columns)
     scan))
+
+(defn scan-for-start-including-stop
+  [columns #^String start-id #^String stop-id]
+  (let [stop-filter (InclusiveStopFilter. (.getBytes stop-id))]
+    (scan-for-start-and-filter columns start-id stop-filter)))
 
 (defn table-scanner
+  "Does not include stop row, if given.
+   Use table-scanner-including-stop, if stop row required."
   ([#^String hbase-table-name columns]
      (let [table (hbase-table hbase-table-name)]
        (.getScanner table (scan-for-all columns))))
-  ([#^String hbase-table-name columns #^String start-row-string]
+  ([#^String hbase-table-name columns #^String start-id]
      (let [table (hbase-table hbase-table-name)]
-       (.getScanner table (scan-for-start columns (.getBytes start-row-string)))))
-  ([#^String hbase-table-name columns #^String start-row-string #^String end-row-string]
+       (.getScanner table (scan-for-start columns start-id))))
+  ([#^String hbase-table-name columns #^String start-id #^String stop-id]
      (let [table (hbase-table hbase-table-name)]
-       (.getScanner table (scan-for-start-to-end columns (.getBytes start-row-string) (.getBytes end-row-string))))))
+       (.getScanner table (scan-for-start-to-stop columns start-id stop-id)))))
+
+(defn table-scanner-including-stop
+  [#^String hbase-table-name columns #^String start-id #^String stop-id]
+  (let [table (hbase-table hbase-table-name)
+        scan (scan-for-start-including-stop columns start-id stop-id)]
+    (.getScanner table scan)))
+
 (defn hbase-row-seq [scanner]
   (let [first-row (.next scanner)]
     (if-not first-row
