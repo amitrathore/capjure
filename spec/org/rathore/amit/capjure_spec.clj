@@ -66,12 +66,14 @@
   (let [to-flatten {:active_campaigns [3 4 7 10 11 13]}
         flattened (flatten to-flatten)]
     (is (= (count (keys flattened)) 6))
-    (is (= (flattened "active_campaigns:3") 3))
-    (is (= (flattened "active_campaigns:4") 4))
-    (is (= (flattened "active_campaigns:7") 7))
-    (is (= (flattened "active_campaigns:10") 10))
-    (is (= (flattened "active_campaigns:11") 11))
-    (is (= (flattened "active_campaigns:13") 13))))
+    (is (= (sort (:active_campaigns (hydrate flattened)))
+           (sort (map str (:active_campaigns to-flatten)))))
+    (is (= (flattened "active_campaigns:3") HAS-MANY-STRINGS))
+    (is (= (flattened "active_campaigns:4") HAS-MANY-STRINGS))
+    (is (= (flattened "active_campaigns:7") HAS-MANY-STRINGS))
+    (is (= (flattened "active_campaigns:10") HAS-MANY-STRINGS))
+    (is (= (flattened "active_campaigns:11") HAS-MANY-STRINGS))
+    (is (= (flattened "active_campaigns:13") HAS-MANY-STRINGS))))
 
 (deftest test-flatten-large-object
   (let [flattened (flatten hash-object)

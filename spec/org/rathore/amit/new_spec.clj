@@ -201,4 +201,5 @@
   (binding [*primary-keys-config* {:encode encoders :decode decoders} 
             *single-column-family?* true
             *hbase-single-column-family* "meta"]
+    (create-hbase-table "capjure_test" 3 "meta")
     (run-tests)))
