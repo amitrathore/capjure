@@ -52,11 +52,12 @@
 (defn caused-by-scanner-timeout? [ex]
   (some #(isa? (type %) org.apache.hadoop.hbase.client.ScannerTimeoutException)
         (exception-causes ex)))
+
 (defn next-result-scanner
+  "Returns vector of next result and whether exception occurred in retrieval."
   [scanner]
   (try
    (let [next-result (.next scanner)]
-     (with-out-str (println next-result))
      [next-result false])
    (catch RuntimeException e
      (if (caused-by-scanner-timeout? e)
