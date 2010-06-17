@@ -12,6 +12,8 @@
 (def *hbase-single-column-family*)
 (def *primary-keys-config*)
 
+(def HAS-MANY-STRINGS "1c8fd7d")
+
 (defn COLUMN-NAME-DELIMITER []
   (if *single-column-family?* "__" ":"))
 
@@ -129,7 +131,7 @@
 
 (defn process-strings [key strings]
   (reduce (fn [ret the-string]
-            (assoc ret (new-key key (COLUMN-NAME-DELIMITER) the-string) the-string))
+            (assoc ret (new-key key (COLUMN-NAME-DELIMITER) the-string) HAS-MANY-STRINGS))
           {} strings))
 
 (defn prepend-keys-for-single-column-family [flattened]
@@ -190,7 +192,7 @@
   (let [#^String value (.trim (str (flattened key-name)))
         [#^String column-family #^String column-name] (tokenize-column-name key-name)]
     (cond
-     (= column-name value) (has-many-strings-hydration hydrated column-family value)
+     (= HAS-MANY-STRINGS value) (has-many-strings-hydration hydrated column-family column-name)
      (is-from-primary-keys? column-family) (has-many-objects-hydration hydrated column-family column-name value)
      (column-name-empty? key-name) (has-one-string-hydration hydrated column-family value)
      :else (has-one-object-hydration hydrated column-family column-name value))))

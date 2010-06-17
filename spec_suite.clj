@@ -57,13 +57,13 @@
 (def keys-config {:encode encoders :decode decoders})
 
 (defn run-capjure-spec-suite []
-  (binding [*hbase-master* "arryn.local:60000"
+  (binding [*hbase-master* "localhost:60000"
             *single-column-family?* false
             *primary-keys-config* keys-config]
     (run-tests 'capjure-spec)))
 
 (defn run-new-spec-suite []
-  (binding [*hbase-master* "arryn.local:60000"
+  (binding [*hbase-master* "localhost:60000"
             *single-column-family?* true
             *hbase-single-column-family* "meta"
             *primary-keys-config* keys-config]
