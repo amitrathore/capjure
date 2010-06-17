@@ -59,7 +59,7 @@
   (try
    (let [next-result (.next scanner)]
      [next-result false])
-   (catch RuntimeException e
+   (catch Exception e
      (if (caused-by-scanner-timeout? e)
        [nil true]
        (throw e)))))
