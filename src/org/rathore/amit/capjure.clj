@@ -14,6 +14,15 @@
 
 (def HAS-MANY-STRINGS "1c8fd7d")
 
+(defmacro with-hbase-table [[table hbase-table-name] & exprs]
+  `(let [~table (hbase-table ~hbase-table-name)]
+     (do ~@exprs
+         (.close ~table))))
+
+(defmacro with-scanner [[scanner] & exprs]
+  `(do ~@exprs
+       (.close ~scanner)))
+
 (defn COLUMN-NAME-DELIMITER []
   (if *single-column-family?* "__" ":"))
 
@@ -485,9 +494,9 @@
   (delete-all-rows-versions hbase-table-name row-ids-as-strings))
 
 (defmemoized column-families-for [hbase-table-name]
-  (let [table (hbase-table hbase-table-name)
-        table-descriptor (.getTableDescriptor table)]
-    (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor))))
+  (with-hbase-table [table hbase-table-name]
+    (let [table-descriptor (.getTableDescriptor table)]
+      (map #(String. (.getNameWithColon %)) (.getFamilies table-descriptor)))))
 
 (defn simple-delete-row [hbase-table-name row-id]
   (let [table (hbase-table hbase-table-name)
@@ -546,12 +555,3 @@
      (table-exists? table-name (hbase-admin)))
   ([table-name hadmin]
      (.tableExists hadmin table-name)))
-
-(defmacro with-hbase-table [[table hbase-table-name] & exprs]
-  `(let [~table (hbase-table ~hbase-table-name)]
-     (do ~@exprs
-         (.close ~table))))
-
-(defmacro with-scanner [[scanner] & exprs]
-  `(do ~@exprs
-       (.close ~scanner)))
