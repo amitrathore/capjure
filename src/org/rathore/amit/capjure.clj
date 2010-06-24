@@ -15,13 +15,15 @@
 (def HAS-MANY-STRINGS "1c8fd7d")
 
 (defmacro with-hbase-table [[table hbase-table-name] & exprs]
-  `(let [~table (hbase-table ~hbase-table-name)]
-     (do ~@exprs
-         (.close ~table))))
+  `(let [~table (hbase-table ~hbase-table-name)
+         ret# (do ~@exprs)]
+     (.close ~table)
+     ret#))
 
-(defmacro with-scanner [[scanner] & exprs]
-  `(do ~@exprs
-       (.close ~scanner)))
+;; (defmacro with-scanner [[scanner] & exprs]
+;;   `(let [ret# (do ~@exprs)]
+;;      (.close ~scanner)
+;;      ret#))
 
 (defn COLUMN-NAME-DELIMITER []
   (if *single-column-family?* "__" ":"))
