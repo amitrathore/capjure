@@ -110,5 +110,14 @@
     (is (= (count cart-items) 2))
     (is (= (cart-item :sku) "OB-BW-LNGR (RED) LL"))
     (is (= (cart-item :merchant_product_id) "OB-BW-LNGR"))))
-	     
 
+
+	     
+(deftest test-to-bytes
+  (are [expected value] (= expected (String. (to-bytes value)))
+       
+       "" nil
+       "true" true
+       "false" false
+       "420" 420
+       "string" "string"))

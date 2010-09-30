@@ -83,7 +83,7 @@
        (insert-with-put object-to-save hbase-table-name put))))
 
 (defn to-bytes [value]
-  (Bytes/toBytes (str (or value ""))))
+  (Bytes/toBytes (str value)))
 
 (defn add-to-insert-batch [put flattened-list]
   (doseq [[column value] flattened-list]
