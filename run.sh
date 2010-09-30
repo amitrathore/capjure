@@ -18,20 +18,17 @@ if [ ! -f /etc/clojure.conf -a ! -f ~/.clojure.conf ]; then
 fi
 
 CAPJURE_HOME="."
-capjure_jars="${CAPJURE_HOME}/lib/java/"
+capjure_jars="${CAPJURE_HOME}/lib/java"
 capjure_clj="${CAPJURE_HOME}/spec/"
 capjure_src="${CAPJURE_HOME}/src/"
 
 clj_cp="."
-[ -f /etc/clojure.conf ] && . /etc/clojure.conf
-[ -f ~/.clojure.conf ]   && . ~/.clojure.conf
-[ -f ~/.clojurerc ] && clj_rc=~/.clojurerc
-[ -d "${clj_ext}" ] && clj_cp="${clj_cp}:${capjure_jars}/*:${capjure_src}:${capjure_clj}:${clj_ext}/*"
+clj_cp="${clj_cp}:${capjure_jars}/*:${capjure_src}:${capjure_clj}:${clj_ext}/*"
 
 if [ -n "${clj_lib}" ]; then
     export LD_LIBRARY_PATH=${clj_lib}:$LD_LIBRARY_PATH
 fi
 
 # 
-echo "Use the clj_ext env var to add jars to the classpath."
+echo exec java -Dpid=$$ ${clj_opts} -cp ${clj_cp}:${clj} ${clj_wrapper} clojure.main ${clj_rc} $*
 exec java -Dpid=$$ ${clj_opts} -cp ${clj_cp}:${clj} ${clj_wrapper} clojure.main ${clj_rc} $*
