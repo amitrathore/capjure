@@ -11,7 +11,7 @@
                 {:insert_type "viewed_aggregate" :html_id "cinch_id_1233794973977" :action_id 2001 :cinch_unit_price 98.95 :merchant_unit_price 109.95 :merchant_product_id "EZ-30DC-HD" :campaign_id 10} 
                 {:insert_type "viewed_product_detail", :html_id "cinch_id_1233794973978" :action_id 2002 :cinch_unit_price 98.95 :merchant_unit_price 109.95 :merchant_product_id "EZ-30DC-HD" :campaign_id 10}]
       :http_client {:browser "Firefox" :ip_address "192.168.10.10" :operating_system_version "OS X" :operating_system "Macintosh" :browser_version "3.0"}       
-      :page {:request_url "http://chairs.vasanta.hq.cinchcorp.com/heavy-duty-3034-aluminum-frame-directors-chair-p-86.html" :referrer "http://chairs.vasanta.hq.cinchcorp.com/directors-chairs-c-1.html" :merchant_template_name "productinfo"}
+      :page {:request_url "http://chairs.vasanta.hq.cinchcorp.com/heavy-duty-3034-aluminum-frame-directors-chair-p-86.html" :referrer "http://chairs.vasanta.hq.cinchcorp.com/directors-chairs-c-1.html" :merchant {:template_name "productinfo"}}
       :consumer {:id "36799" :kind "interested" :email_address "6846821c-c6af-3052-cbf7-7a465c27aa69@interested.cinchcorp.com"}
       :api "0.0.1.0"})
 
@@ -21,13 +21,27 @@
 (defn is-same-sequence [seqa seqb]
   (is (= (sort seqa) (sort seqb))))
 
+(deftest test-prepend-to-keys 
+  (are [expected prefix value] (= expected (prepend-to-keys prefix "__" value))
+       
+       {"a__b" 1}      "a"   {:b 1}
+       {"a__b__c" 1}   "a"   {:b {:c 1}}))
+
+(deftest test-process-key-value
+  (are [expected key value] (= expected (process-key-value key value))
+       
+       {}                 :a    {}
+       {"a:" nil}         :a    nil
+       {"a:b" 1}          :a    {:b 1}
+       {"a:b__c" 1}       :a    {:b {:c 1}}))
+
 (deftest test-flatten-single-family-and-simple-elements
   (let [flattened (flatten consumer-event)]
     (is (= (flattened "meta:api__") "0.0.1.0"))
     (is (= (flattened "meta:event_type__") "inserts"))
     (is (= (flattened "meta:merchant__name") "Portable Folding Chairs"))
     (is (= (flattened "meta:http_client__browser") "Firefox"))
-    (is (= (flattened "meta:page__merchant_template_name") "productinfo"))
+    (is (= (flattened "meta:page__merchant__template_name") "productinfo"))
     (is (= (flattened "meta:consumer__id") "36799"))))
 
 (deftest test-flatten-multiple-family-and-simple-elements
@@ -37,7 +51,7 @@
       (is (= (flattened "event_type:") "inserts"))
       (is (= (flattened "merchant:name") "Portable Folding Chairs"))
       (is (= (flattened "http_client:browser") "Firefox"))
-      (is (= (flattened "page:merchant_template_name") "productinfo"))
+      (is (= (flattened "page:merchant__template_name") "productinfo"))
       (is (= (flattened "consumer:id") "36799")))))
 
 (deftest test-flatten-single-family-and-has-many-hashes

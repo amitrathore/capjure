@@ -100,6 +100,7 @@
   (str (symbol-name part1) separator (symbol-name part2)))
 
 (defn prepend-to-keys [prefix separator hash-map]
+  (println prefix "--"  separator "--" hash-map)
   (reduce (fn [ret key]
             (assoc ret
               (new-key prefix separator key)
@@ -114,6 +115,7 @@
           {} (keys hash-map)))
 
 (declare process-multiple process-maps process-map process-strings)
+
 (defn process-key-value [key value]
   (cond
    (map? value) (prepend-to-keys key (COLUMN-NAME-DELIMITER) value)
