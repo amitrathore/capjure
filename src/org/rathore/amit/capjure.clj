@@ -547,6 +547,13 @@
 (defn drop-hbase-table [#^String hbase-table-name]
   (.deleteTable (hbase-admin) hbase-table-name))
 
+(defn truncate-hbase-table [#^String hbase-table-name]
+  (with-hbase-table [table hbase-table-name]
+    (let [table-descriptor (.getTableDescriptor table)]
+      (disable-table hbase-table-name)
+      (drop-hbase-table hbase-table-name)
+      (.createTable (hbase-admin) table-descriptor))))
+
 (defn hbase-table [#^String hbase-table-name]
   (let [table (HTable. (hbase-config) hbase-table-name)]
     (.setScannerCaching table 1000)

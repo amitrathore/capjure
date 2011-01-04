@@ -21,7 +21,7 @@
         result (.getRowOrBefore (hbase-table table-name)
                                 (.getBytes stop-row-id)
                                 (.getBytes family-name))]
-    (and result (String. (.getRow result)))))
+    (and result (.getRow result) (String. (.getRow result)))))
 
 (defn last-row-id-in-table
   "Retrieves the last row-id in a table. Returns nil if no rows found."
