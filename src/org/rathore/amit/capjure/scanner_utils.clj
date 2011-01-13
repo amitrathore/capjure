@@ -1,9 +1,8 @@
 (ns org.rathore.amit.capjure.scanner-utils
   (:import org.apache.hadoop.hbase.client.ScannerTimeoutException)
-  (:use [clojure.contrib.seq-utils :only (partition-all)]
-        [com.cinch.furtive.consumer-event.utils
+  (:use [com.cinch.furtive.consumer-event.utils
          :only [timestamp-from-event-id]]
-        org.rathore.amit.capjure))
+        [org.rathore.amit.capjure :exclude [flatten]]))
 
 (def HYPOTHETICAL-LAST-ROW-ID "zzzzzzzzzzzzzzz")
 

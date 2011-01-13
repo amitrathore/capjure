@@ -1,4 +1,5 @@
 (ns org.rathore.amit.capjure
+  (:refer-clojure :exclude [flatten])
   (:use org.rathore.amit.capjure-utils)
   (:import (java.util Set)
            (org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor)
