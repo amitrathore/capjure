@@ -1,6 +1,6 @@
 (ns org.rathore.amit.capjure.scanner-utils
   (:import org.apache.hadoop.hbase.client.ScannerTimeoutException)
-  (:use [com.cinch.furtive.consumer-event.utils
+  (:use [furtive.consumer-event.utils
          :only [timestamp-from-event-id]]
         [org.rathore.amit.capjure :exclude [flatten]]))
 
