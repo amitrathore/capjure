@@ -3,7 +3,7 @@
 (import '(java.util Map$Entry))
 
 (defmacro defmemoized [fn-name args & body]
-  `(def ~fn-name (memoize (fn ~args 
+  `(def ~fn-name (memoize (fn ~args
 			    (do
 			      ~@body)))))
 
@@ -17,7 +17,9 @@
   {(String. (.getKey q-entry)) (apply merge (map stringify-column-entry (.getValue q-entry)))})
 
 (defn stringify-nav-map [nmap]
-  (apply merge (map stringify-qualifier-entry nmap)))
+  (if nmap
+    (apply merge (map stringify-qualifier-entry nmap))
+    {}))
 
 (defn all-versions-from-map [qualifer-column c-map]
   (let [[qualifier column] (.split qualifer-column ":")
