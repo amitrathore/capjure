@@ -302,8 +302,7 @@
 (defn read-rows-including
   "Returns rows from start to stop IDs provided.  Includes stop row."
   [hbase-table-name columns start-id stop-id]
-  (let [#^Scanner scanner (table-scanner-including-stop hbase-table-name columns
-                                                        start-id stop-id)]
+  (let [#^Scanner scanner (table-scanner-including-stop hbase-table-name columns start-id stop-id)]
     (iterator-seq (.iterator scanner))))
 
 (defn row-id-of-row [hbase-row]
@@ -434,8 +433,8 @@
 
 (defn table-scanner-including-stop
   [#^String hbase-table-name columns #^String start-id #^String stop-id]
-  (let [table (hbase-table hbase-table-name)
-        scan (scan-for-start-including-stop columns start-id stop-id)]
+  (let [^HTable table (hbase-table hbase-table-name)
+        ^Scan scan (scan-for-start-including-stop columns start-id stop-id)]
     (.getScanner table scan)))
 
 (defn hbase-row-seq [scanner]
@@ -555,8 +554,8 @@
       (drop-hbase-table hbase-table-name)
       (.createTable (hbase-admin) table-descriptor))))
 
-(defn hbase-table [#^String hbase-table-name]
-  (let [table (HTable. (hbase-config) hbase-table-name)]
+(defn hbase-table [^String hbase-table-name]
+  (let [table (HTable. ^HBaseConfiguration (hbase-config) hbase-table-name)]
     (.setScannerCaching table 1000)
     table))
 
