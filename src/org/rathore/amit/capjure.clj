@@ -564,3 +564,9 @@
      (table-exists? table-name (hbase-admin)))
   ([table-name hadmin]
      (.tableExists hadmin table-name)))
+
+(defn get-table-name-from-desc [table-desc]
+  (apply str (map char (.getName table-desc))))
+
+(defn list-tables []
+  (map get-table-name-from-desc (.listTables (hbase-admin))))
