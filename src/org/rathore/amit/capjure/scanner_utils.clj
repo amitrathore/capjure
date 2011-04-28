@@ -63,7 +63,9 @@
        [nil true]
        (throw e)))))
 
-(defn safe-scan-seq [args-map]
+(defn safe-scan-seq
+  "Workaround a bug in HBase scanner which sometimes returns prematurely with no error"
+  [args-map]
   (let [{:keys [scanner scanner-fn start-row-id last-good-row-id
                 expected-last-row-id]}
         args-map
