@@ -64,7 +64,9 @@
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 
 (defn create-put [row-id version-timestamp]
-  (let [put (Put. ^bytes (Bytes/toBytes row-id))]
+  (let [put (Put. ^bytes (if (string? row-id)
+                           (Bytes/toBytes ^String row-id)
+                           (Bytes/toBytes (long row-id))))]
     (if version-timestamp
       (.setTimeStamp ^Put put (long version-timestamp)))
     put))
