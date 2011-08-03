@@ -491,7 +491,10 @@
 
 (defn delete-all-rows-versions [table-name row-ids]
   (dorun
-   (map #(delete-all-versions-for table-name %) row-ids)))
+   (map #(delete-all-versions-for table-name %) row-ids))
+  ;; Thread sleep because hbase deletes can mask puts in the same ms even if they happen afterwards:
+  ;; http://search-hadoop.com/m/rNnhN15Xecu
+  (Thread/sleep 1))
 
 (defn delete-all [#^String hbase-table-name & row-ids-as-strings]
   (delete-all-rows-versions hbase-table-name row-ids-as-strings))
