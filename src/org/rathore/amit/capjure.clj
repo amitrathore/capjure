@@ -506,6 +506,13 @@
         delete (Delete. (.getBytes row-id))]
     (.delete table delete)))
 
+(defn simple-delete-rows-with-sleep [hbase-table-name rows]
+  (doseq [row rows]
+    (simple-delete-row hbase-table-name row))
+  ;; Thread sleep because hbase deletes can mask puts in the same ms even if they happen afterwards:
+  ;; http://search-hadoop.com/m/rNnhN15Xecu
+  (Thread/sleep 1))
+
 (defn column-names-as-strings [^Map result-row]
   (map #(String. ^bytes %) (.keySet result-row)))
 
