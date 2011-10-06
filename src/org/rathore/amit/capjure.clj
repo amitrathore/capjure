@@ -3,10 +3,9 @@
   (:use org.rathore.amit.capjure-utils)
   (:import (java.util Set Map)
            (org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor KeyValue HColumnDescriptor)
-           (org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan Scanner Result HTable$ClientScanner)
-           (org.apache.hadoop.hbase.io BatchUpdate Cell)
+           (org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan ResultScanner Result HTable$ClientScanner)
            (org.apache.hadoop.hbase.util Bytes)
-           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter RegExpRowFilter StopRowFilter RowFilterInterface)))
+           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter)))
 
 (def *hbase-master*)
 (def *single-column-family?*)
@@ -64,12 +63,12 @@
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 
 (defn create-put [row-id version-timestamp]
-  (let [put (Put. ^bytes (if (string? row-id)
-                           (Bytes/toBytes ^String row-id)
-                           (Bytes/toBytes (long row-id))))]
+  (let [b (if (string? row-id)
+            (Bytes/toBytes ^String row-id)
+            (Bytes/toBytes (long row-id)))]
     (if version-timestamp
-      (.setTimeStamp ^Put put (long version-timestamp)))
-    put))
+      (Put. ^bytes b (long version-timestamp))
+      (Put. ^bytes b))))
 
 (defn insert-with-put [object-to-save hbase-table-name ^Put put]
   (let [^HTable table (hbase-table hbase-table-name)
@@ -240,7 +239,8 @@
 
 (defn hbase-object-as-hash [^Result hbase-result]
   (let [extractor (fn [^KeyValue kv]
-                    {(String. (.getColumn kv)) (String. (.getValue kv))})
+                    {(str (String. (.getFamily kv)) ":" (String. (.getQualifier kv)))
+                     (String. (.getValue kv))})
         key-values-objects (.list hbase-result)]
     (apply merge (map extractor key-values-objects))))
 
@@ -264,9 +264,11 @@
     (.exists table ^bytes (.getBytes ^String row-id-string))))
 
 (defn cell-value-as-string [^Result row ^String column-name]
-  (let [value (.getValue row ^bytes (.getBytes column-name))]
-    (if-not value ""
-      (String. value))))
+  (let [[family qualifier] (.split column-name ":")
+        value (.getValue row ^bytes
+                         (.getBytes (or family ""))
+                         (.getBytes (or qualifier "")))]
+    (if-not value "" (String. value))))
 
 (defn create-get
   ([row-id]
@@ -296,21 +298,21 @@
   "Returns rows from start to stop IDs provided.  Does NOT include stop row.
    Use read-rows-including if you'd like to include the stop row."
   [hbase-table-name columns start-id stop-id]
-  (let [#^Scanner scanner (table-scanner hbase-table-name columns
+  (let [#^ResultScanner scanner (table-scanner hbase-table-name columns
                                          start-id stop-id)]
     (iterator-seq (.iterator scanner))))
 
 (defn read-rows-including
   "Returns rows from start to stop IDs provided.  Includes stop row."
   [hbase-table-name columns start-id stop-id]
-  (let [#^Scanner scanner (table-scanner-including-stop hbase-table-name columns start-id stop-id)]
+  (let [#^ResultScanner scanner (table-scanner-including-stop hbase-table-name columns start-id stop-id)]
     (iterator-seq (.iterator scanner))))
 
 (defn row-id-of-row [^Result hbase-row]
   (String. (.getRow hbase-row)))
 
 (defn first-row-id [hbase-table-name column-name]
-  (let [#^Scanner first-row-scanner (table-scanner hbase-table-name [column-name])]
+  (let [#^ResultScanner first-row-scanner (table-scanner hbase-table-name [column-name])]
     (row-id-of-row (first (iterator-seq (.iterator first-row-scanner))))))
 
 (defn remove-single-column-family [all-versions-map]
@@ -382,11 +384,11 @@
 
 (defn table-iterator
   ([^String hbase-table-name columns]
-     (iterator-seq (.iterator ^Scanner (table-scanner hbase-table-name columns))))
+     (iterator-seq (.iterator ^ResultScanner (table-scanner hbase-table-name columns))))
   ([^String hbase-table-name columns start-id]
-     (iterator-seq (.iterator ^Scanner (table-scanner hbase-table-name columns start-id))))
+     (iterator-seq (.iterator ^ResultScanner (table-scanner hbase-table-name columns start-id))))
   ([^String hbase-table-name columns start-id stop-id]
-     (iterator-seq (.iterator ^Scanner (table-scanner hbase-table-name columns start-id stop-id)))))
+     (iterator-seq (.iterator ^ResultScanner (table-scanner hbase-table-name columns start-id stop-id)))))
 
 (defn add-columns-to-scan [#^Scan scan columns]
   (doseq [#^String col columns]
@@ -438,7 +440,7 @@
         ^Scan scan (scan-for-start-including-stop columns start-id stop-id)]
     (.getScanner table scan)))
 
-(defn hbase-row-seq [^Scanner scanner]
+(defn hbase-row-seq [^ResultScanner scanner]
   (let [first-row (.next scanner)]
     (if-not first-row
       nil
@@ -502,7 +504,7 @@
 (defmemoized column-families-for [hbase-table-name]
   (with-hbase-table [table hbase-table-name]
     (let [table-descriptor (.getTableDescriptor ^HTable table)]
-      (map #(String. (.getNameWithColon ^HColumnDescriptor %)) (.getFamilies table-descriptor)))))
+      (map #(String. (.getNameAsString ^HColumnDescriptor %)) (.getFamilies table-descriptor)))))
 
 (defn simple-delete-row [hbase-table-name ^String row-id]
   (let [table ^HTable (hbase-table hbase-table-name)
@@ -532,7 +534,7 @@
                      (.setMaxVersions hcdesc max-versions)
                      (.addFamily desc hcdesc)))]
     (doall (map col-desc column-families))
-    (.createTableAsync ^HBaseAdmin (hbase-admin) desc)))
+    (.createTable ^HBaseAdmin (hbase-admin) desc)))
 
 (defn add-hbase-columns [^String table-name column-family-names versions]
   (if-not (empty? column-family-names)
