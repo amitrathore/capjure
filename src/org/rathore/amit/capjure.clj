@@ -62,13 +62,42 @@
 
 (declare flatten add-to-insert-batch capjure-insert hbase-table read-row read-cell)
 
-(defn create-put [row-id version-timestamp]
+
+
+;;  HBase client shim.
+
+(def is-hbase02 (atom nil)) ; not quite accurate...
+
+(defn create-put-hbase02
+  "Create an hbase 0.20 Put object with given bytes and optional
+   timestamp."
+  [^bytes b version-timestamp]
+  (if version-timestamp
+    (.setTimeStamp (Put. ^bytes b) (long version-timestamp))
+    (Put. ^bytes b)))
+
+(defn create-put-hbase09
+  "Create an hbase 0.90 Put object. Fall back to 0.20 version if the
+   0.90 API isn't available, and update `is-hbase02` to true."
+  [^bytes b version-timestamp]
+  (try
+    (if version-timestamp
+      (Put. ^bytes b (long version-timestamp))
+      (Put. ^bytes b))
+    (catch Exception e (do
+                         (reset! is-hbase02 true)
+                         (create-put-hbase02 b version-timestamp)))))
+
+(defn create-put
+  "Create an hbase Put object. Dispatches to 0.20 or 0.90 based on the
+  value of `is-hbase02`."
+  [row-id version-timestamp]
   (let [b (if (string? row-id)
             (Bytes/toBytes ^String row-id)
             (Bytes/toBytes (long row-id)))]
-    (if version-timestamp
-      (Put. ^bytes b (long version-timestamp))
-      (Put. ^bytes b))))
+    (if @is-hbase02
+      (create-put-hbase02 b version-timestamp)
+      (create-put-hbase09 b version-timestamp))))
 
 (defn insert-with-put [object-to-save hbase-table-name ^Put put]
   (let [^HTable table (hbase-table hbase-table-name)
