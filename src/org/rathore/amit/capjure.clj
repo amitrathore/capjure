@@ -556,6 +556,17 @@
 (defn hbase-admin []
   (HBaseAdmin. (hbase-config)))
 
+(defn create-hbase-table-multiple-versions
+  [#^String table-name & column-families-and-versions]
+  (let [desc (HTableDescriptor. table-name)
+        col-desc (fn [[col-family-name max-versions]]
+                   (let [hcdesc (HColumnDescriptor. ^String col-family-name)]
+                     (.setMaxVersions hcdesc max-versions)
+                     (.addFamily desc hcdesc)))]
+    (doseq [family-entry column-families-and-versions]
+      (col-desc family-entry))
+    (.createTable ^HBaseAdmin (hbase-admin) desc)))
+
 (defn create-hbase-table [#^String table-name max-versions & column-families]
   (let [desc (HTableDescriptor. table-name)
         col-desc (fn [col-family-name]
