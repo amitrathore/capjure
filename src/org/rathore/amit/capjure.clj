@@ -5,7 +5,8 @@
            (org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor KeyValue HColumnDescriptor)
            (org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan ResultScanner Result HTable$ClientScanner)
            (org.apache.hadoop.hbase.util Bytes)
-           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter)))
+           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter)
+           (org.apache.hadoop.hbase.io.hfile Compression$Algorithm)))
 
 (def *hbase-master*)
 (def *single-column-family?*)
@@ -557,12 +558,18 @@
   (HBaseAdmin. (hbase-config)))
 
 (defn create-hbase-table-multiple-versions
-  [#^String table-name & column-families-and-versions]
+  "Create an HBase table with the given table-name and
+  column-family-name - version tuples. LZO compression is turned on
+  for column families."
+  [#^String table-name &
+  column-families-and-versions]
   (let [desc (HTableDescriptor. table-name)
         col-desc (fn [[col-family-name max-versions]]
                    (let [hcdesc (HColumnDescriptor. ^String col-family-name)]
                      (.setMaxVersions hcdesc max-versions)
-                     (.addFamily desc hcdesc)))]
+                     (.addFamily desc hcdesc)
+                     (.setCompressionType hcdesc Compression$Algorithm/LZO)
+                     (.setCompactionCompressionType hcdesc Compression$Algorithm/LZO)))]
     (doseq [family-entry column-families-and-versions]
       (col-desc family-entry))
     (.createTable ^HBaseAdmin (hbase-admin) desc)))
