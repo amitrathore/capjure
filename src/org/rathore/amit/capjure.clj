@@ -5,7 +5,8 @@
            (org.apache.hadoop.hbase HBaseConfiguration HColumnDescriptor HTableDescriptor KeyValue HColumnDescriptor)
            (org.apache.hadoop.hbase.client Delete Get HBaseAdmin HTable Put Scan ResultScanner Result HTable$ClientScanner)
            (org.apache.hadoop.hbase.util Bytes)
-           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter)))
+           (org.apache.hadoop.hbase.filter Filter InclusiveStopFilter)
+           (org.apache.hadoop.hbase.io.hfile Compression$Algorithm)))
 
 (def *hbase-master*)
 (def *single-column-family?*)
@@ -556,11 +557,27 @@
 (defn hbase-admin []
   (HBaseAdmin. (hbase-config)))
 
+(defn hbase-column-descriptor
+  "Create an HColumnDescriptor with given `col-name`, and initialize
+  with common options, such as compression type."
+  [^String col-name]
+  (let [hcdesc (doto (HColumnDescriptor. ^String col-name)
+                 (.setCompressionType Compression$Algorithm/LZO))]
+    ;; Compat between hbase 0.20 and 0.90
+    (try
+      (.setCompactionCompressionType hcdesc Compression$Algorithm/LZO)
+      (catch Exception e nil))
+    hcdesc))
+
 (defn create-hbase-table-multiple-versions
-  [#^String table-name & column-families-and-versions]
+  "Create an HBase table with the given table-name and
+  column-family-name - version tuples. LZO compression is turned on
+  for column families."
+  [#^String table-name &
+  column-families-and-versions]
   (let [desc (HTableDescriptor. table-name)
         col-desc (fn [[col-family-name max-versions]]
-                   (let [hcdesc (HColumnDescriptor. ^String col-family-name)]
+                   (let [hcdesc (hbase-column-descriptor col-family-name)]
                      (.setMaxVersions hcdesc max-versions)
                      (.addFamily desc hcdesc)))]
     (doseq [family-entry column-families-and-versions]
@@ -570,7 +587,7 @@
 (defn create-hbase-table [#^String table-name max-versions & column-families]
   (let [desc (HTableDescriptor. table-name)
         col-desc (fn [col-family-name]
-                   (let [hcdesc (HColumnDescriptor. ^String col-family-name)]
+                   (let [hcdesc (hbase-column-descriptor col-family-name)]
                      (.setMaxVersions hcdesc max-versions)
                      (.addFamily desc hcdesc)))]
     (doall (map col-desc column-families))
@@ -580,7 +597,7 @@
   (if-not (empty? column-family-names)
     (let [admin ^HBaseAdmin (hbase-admin)
           col-desc (fn [^String col-name]
-                     (let [desc (HColumnDescriptor. col-name)]
+                     (let [desc (hbase-column-descriptor col-name)]
                        (.setMaxVersions desc versions)
                        desc))]
       (.disableTable admin (.getBytes table-name))
