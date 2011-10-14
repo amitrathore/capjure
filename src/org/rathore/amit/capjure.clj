@@ -15,6 +15,13 @@
 
 (def HAS-MANY-STRINGS "1c8fd7d")
 
+;; Hack to support hbase 0.20 and hbase 0.90
+(def is-hbase-02 (try
+                   (import '[org.apache.hbase.client Scanner])
+                   true
+                   (catch Exception e false)))
+
+
 (defmacro with-hbase-table [[table hbase-table-name] & exprs]
   `(let [~table ^HTable (hbase-table ~hbase-table-name)
          ret# (do ~@exprs)]
@@ -65,10 +72,6 @@
 
 
 
-;;  HBase client shim.
-
-(def is-hbase02 (atom nil)) ; not quite accurate...
-
 (defn create-put-hbase02
   "Create an hbase 0.20 Put object with given bytes and optional
    timestamp."
@@ -81,13 +84,9 @@
   "Create an hbase 0.90 Put object. Fall back to 0.20 version if the
    0.90 API isn't available, and update `is-hbase02` to true."
   [^bytes b version-timestamp]
-  (try
-    (if version-timestamp
+  (if version-timestamp
       (Put. ^bytes b (long version-timestamp))
-      (Put. ^bytes b))
-    (catch Exception e (do
-                         (reset! is-hbase02 true)
-                         (create-put-hbase02 b version-timestamp)))))
+      (Put. ^bytes b)))
 
 (defn create-put
   "Create an hbase Put object. Dispatches to 0.20 or 0.90 based on the
@@ -96,7 +95,7 @@
   (let [b (if (string? row-id)
             (Bytes/toBytes ^String row-id)
             (Bytes/toBytes (long row-id)))]
-    (if @is-hbase02
+    (if is-hbase-02
       (create-put-hbase02 b version-timestamp)
       (create-put-hbase09 b version-timestamp))))
 
@@ -561,12 +560,10 @@
   "Create an HColumnDescriptor with given `col-name`, and initialize
   with common options, such as compression type."
   [^String col-name]
-  (let [hcdesc (doto (HColumnDescriptor. ^String col-name)
-                 (.setCompressionType Compression$Algorithm/LZO))]
-    ;; Compat between hbase 0.20 and 0.90
-    (try
-      (.setCompactionCompressionType hcdesc Compression$Algorithm/LZO)
-      (catch Exception e nil))
+  (let [hcdesc (HColumnDescriptor. ^String col-name)]
+    (when-not is-hbase-02
+      (.setCompressionType hcdesc Compression$Algorithm/LZO)
+      (.setCompactionCompressionType hcdesc Compression$Algorithm/LZO))
     hcdesc))
 
 (defn create-hbase-table-multiple-versions
