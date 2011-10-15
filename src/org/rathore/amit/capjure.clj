@@ -17,7 +17,7 @@
 
 ;; Hack to support hbase 0.20 and hbase 0.90
 (def is-hbase-02 (try
-                   (import '[org.apache.hbase.client Scanner])
+                   (import '[org.apache.hadoop.hbase.client Scanner])
                    true
                    (catch Exception e false)))
 
