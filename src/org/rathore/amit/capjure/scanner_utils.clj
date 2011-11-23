@@ -1,5 +1,5 @@
 (ns org.rathore.amit.capjure.scanner-utils
-  (:import org.apache.hadoop.hbase.client.ScannerTimeoutException)
+  (:import (org.apache.hadoop.hbase.client ScannerTimeoutException ResultScanner))
   (:use [furtive.consumer-event.utils
          :only [timestamp-from-event-id]]
         [org.rathore.amit.capjure :exclude [flatten]]))
@@ -54,7 +54,7 @@
 
 (defn next-result-scanner
   "Returns vector of next result and whether exception occurred in retrieval."
-  [scanner]
+  [^ResultScanner scanner]
   (try
    (let [next-result (.next scanner)]
      [next-result false])
