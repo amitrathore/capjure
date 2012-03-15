@@ -99,11 +99,22 @@
       (create-put-hbase02 b version-timestamp)
       (create-put-hbase09 b version-timestamp))))
 
-(defn insert-with-put [object-to-save hbase-table-name ^Put put]
-  (let [^HTable table (hbase-table hbase-table-name)
-        flattened (flatten object-to-save)]
+(defn insert-with-table-and-put [object-to-save ^HTable table ^Put put]
+  (let [flattened (flatten object-to-save)]
     (add-to-insert-batch put flattened)
     (.put table put)))
+
+(defn insert-with-put [object-to-save hbase-table-name ^Put put]
+  (let [^HTable table (hbase-table hbase-table-name)]
+    (insert-with-table-and-put object-to-save table put)))
+
+(defn capjure-insert-with-table
+  ([object-to-save ^HTable hbase-table row-id]
+     (let [put (create-put row-id nil)]
+       (insert-with-table-and-put object-to-save hbase-table put)))
+  ([object-to-save ^HTable hbase-table row-id version-timestamp]
+     (let [put (create-put row-id version-timestamp)]
+       (insert-with-put object-to-save hbase-table put))))
 
 (defn capjure-insert
   ([object-to-save hbase-table-name row-id]
